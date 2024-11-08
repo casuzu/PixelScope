@@ -211,7 +211,7 @@ SCREEN_HEIGHT_string = str(SCREEN_HEIGHT)
 root.geometry(SCREEN_WIDTH_string + "x" + SCREEN_HEIGHT_string)
 
 # Change the background color using configure
-root.configure(bg='black')
+root.configure(bg='red')
 
 #Widgets x and y general positions
 widget_xpos = int(7*SCREEN_WIDTH/8)
