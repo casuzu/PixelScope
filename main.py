@@ -17,7 +17,7 @@ def send_to_file(coordinates, file_name):
 
     with open(filename, 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        csv_writer.writerows([["P1", "P2"]])
+        csv_writer.writerows([["[X1, Y1]", "[X2, Y2]"]])
         csv_writer.writerows(coordinates)
     csv_file.close()
 
@@ -98,24 +98,27 @@ if images_same_size(img_edged, img):
                 spline.modeselect = "Calibration"
                 spline.mode()
 
-        elif key == ord('u') or key == ord('U'):
-            spline.undo_point()
 
         # Close program with keyboard 'q'
         elif key == ord('q') or key == ord('Q'):
-            if not spline.get_points_coord() or not spline.get_lines_coord():
+            if spline.get_lines():
                 #points_list = spline.get_points_coord()
-                lines_list = spline.get_lines_coord()
-                vlines_list = spline.get_v_lines_coord()
-                hlines_list = spline.get_h_lines_coord()
-
-                #print("Points = {}".format(points_list))
+                lines_list = [[i.starting_point, i.ending_point] for i in spline.get_lines()]
                 print("Lines = {}".format(lines_list))
-                print(" Vertical Lines = {}".format(vlines_list))
-                print(" Horizontal Lines = {}".format(hlines_list))
 
-                send_to_file(vlines_list, "Vertical_Lines")
-                send_to_file(hlines_list, "Horizontal_Lines")
+                vertic_lines_list = [[i.starting_point, i.ending_point]
+                                       for i in spline.get_lines()
+                                       if i.get_type() =="Vertical"]
+
+                horizon_lines_list = [[i.starting_point, i.ending_point]
+                                       for i in spline.get_lines()
+                                       if i.get_type() == "Horizontal"]
+
+                print("\nVertical Lines = {}".format(vertic_lines_list))
+                print("\nHorizontal Lines = {}".format(horizon_lines_list))
+
+                send_to_file(vertic_lines_list, "Vertical_Lines")
+                send_to_file(horizon_lines_list, "Horizontal_Lines")
 
 
             cv2.destroyAllWindows()
