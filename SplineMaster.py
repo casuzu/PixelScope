@@ -285,7 +285,6 @@ class MySpline:
     def __draw_line(self, event, x, y, calibration_mode = False):
         # Record starting (x,y) coordinates on left mouse button click
         if event == cv2.EVENT_LBUTTONDOWN and not self.mouse_dragging:
-            print("mouse dragging:", self.mouse_dragging)
             self.line_complete += 1
             if self.line_complete == 1:
                 #Create the point to make a line
