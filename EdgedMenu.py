@@ -65,49 +65,41 @@ class MyEdgedImageMaker:
 
 #Load image from file upload and store as tkinter image
     def upload_image(self):
-        #Used for recursive loop below
-        file_not_found = False
 
         #Open Window's File upload dialog
         filepath = filedialog.askopenfilename()
 
-        #If filepath does not exist
-        if not filepath:
-            #Use default image if file not found
-            filepath = self.file_path_default
-            file_not_found = True
+        #If filepath does exist
+        if filepath:
 
-        #Get image from file path
-        img_selected = cv2.imread(filepath)
+            #Get image from file path
+            img_selected = cv2.imread(filepath)
 
-        # Resize the image
-        img_selected = cv2.resize(img_selected, self.target_size)
+            # Resize the image
+            img_selected = cv2.resize(img_selected, self.target_size)
 
-        #Convert to tkinter image
-        tk_img = convert_to_tk_img(img_selected)
+            #Convert to tkinter image
+            tk_img = convert_to_tk_img(img_selected)
 
-        #Change the tkinter image display to the user's
-        #selected image
-        self.img_label.config(image=tk_img)
-        self.img_label.image = tk_img  # Keep a reference
+            #Change the tkinter image display to the user's
+            #selected image
+            self.img_label.config(image=tk_img)
+            self.img_label.image = tk_img  # Keep a reference
 
-        #Creates a recursive loop until existing image is uploaded
-        if file_not_found:
-            self.upload_image()
 
-        #Save the file path of the selected image
-        self.img_file_path = filepath
+            #Save the file path of the selected image
+            self.img_file_path = filepath
 
-        # If the image is uploaded, show the canny threshold sliders
-        low_threshold_slider.pack(side=tk.RIGHT, padx=10)
-        high_threshold_slider.pack(side=tk.RIGHT, padx=10)
+            # If the image is uploaded, show the canny threshold sliders
+            low_threshold_slider.pack(side=tk.RIGHT, padx=10)
+            high_threshold_slider.pack(side=tk.RIGHT, padx=10)
 
-        #Displays and move the button to a new position after image is uploaded
-        #img_btn_save.place(x=widget_xpos + 75, y=widget_ypos + 30)
-        img_btn_save.pack(pady=25, fill=tk.X)
+            #Displays and move the button to a new position after image is uploaded
+            #img_btn_save.place(x=widget_xpos + 75, y=widget_ypos + 30)
+            img_btn_save.pack(pady=25, fill=tk.X)
 
-        #Calls edge maker after image is uploaded
-        self.edge_maker(0)
+            #Calls edge maker after image is uploaded
+            self.edge_maker(0)
 
     def load_image1(self):
         # Open Window's File upload dialog
