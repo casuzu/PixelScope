@@ -12,6 +12,9 @@ root.title("Edged Image Maker")
 
 SCREEN_WIDTH = root.winfo_screenwidth()
 SCREEN_HEIGHT = root.winfo_screenheight()
+
+root.minsize(SCREEN_WIDTH, SCREEN_HEIGHT)
+
 def convert_to_tk_img(opencv_img): #Converts opencv image to tkinter image
     RGB_img = cv2.cvtColor(opencv_img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
@@ -100,7 +103,8 @@ class MyEdgedImageMaker:
         high_threshold_slider.pack(side=tk.RIGHT, padx=10)
 
         #Displays and move the button to a new position after image is uploaded
-        img_btn_save.place(x=widget_xpos + 75, y=widget_ypos + 30)
+        #img_btn_save.place(x=widget_xpos + 75, y=widget_ypos + 30)
+        img_btn_save.pack(pady=25, fill=tk.X)
 
         #Calls edge maker after image is uploaded
         self.edge_maker(0)
@@ -236,29 +240,27 @@ edged_img_maker.img_label.pack(side=tk.LEFT, padx=10)
 edged_img_maker.edged_img_label = tk.Label(root)
 edged_img_maker.edged_img_label.pack(side=tk.LEFT, padx=10)
 
+# Create a main frame for buttons
+button_frame = tk.Frame(root)
+button_frame.pack(side=tk.RIGHT, padx=20, pady=20, fill=tk.Y)
+
 #Show upload button and set the button position
-img_btn_upload = tk.Button(root, text="UPLOAD IMAGE", command=edged_img_maker.upload_image)
-#Move the button to a new position
-img_btn_upload.place(x=widget_xpos + 10, y= widget_ypos - 70)
-
-
-#button and set the button position
-img2_btn_load = tk.Button(root, text="LOAD IMAGE 2", command=edged_img_maker.load_image2)
-img2_btn_load.pack(side=tk.RIGHT, padx=10)
-
+img_btn_upload = tk.Button(button_frame, text="UPLOAD IMAGE", command=edged_img_maker.upload_image)
+img_btn_upload.pack(pady=25, fill=tk.X)
 
 #Show load image 1 button and set the button position
-img1_btn_load = tk.Button(root, text="LOAD IMAGE 1", command=edged_img_maker.load_image1)
-img1_btn_load.pack(side=tk.RIGHT, padx=10)
+img1_btn_load = tk.Button(button_frame, text="LOAD IMAGE 1", command=edged_img_maker.load_image1)
+img1_btn_load.pack(pady=25, fill=tk.X)
 
+#Show load image 2 button and set the button position
+img2_btn_load = tk.Button(button_frame, text="LOAD IMAGE 2", command=edged_img_maker.load_image2)
+img2_btn_load.pack(pady=25, fill=tk.X)
+
+img_btn_continue = tk.Button(button_frame, text="CONTINUE", command=close_window)
+img_btn_continue.pack(pady=25, fill=tk.X)
 
 #Show save button and set the button position
-img_btn_save = tk.Button(root, text="SAVE IMAGE", command=edged_img_maker.save_edged_img)
-
-
-img_btn_continue = tk.Button(root, text="CONTINUE", command=close_window)
-#Move the button to a new position
-img_btn_continue.place(x=widget_xpos - 30, y= widget_ypos + 30)
+img_btn_save = tk.Button(button_frame, text="SAVE IMAGE", command=edged_img_maker.save_edged_img)
 
 
 # Bind the 'q' key to the close_window function
