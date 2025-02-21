@@ -21,11 +21,3 @@ class MyCalibRegression:
     def get_slope(self):
         return self.__result.params[1]
 
- #b = np.linspace(1, 10, 10)
-# b = [1,2,3,4,5]
-# a = [2, 4, 6, 8, 10]
-# my_reg = MyCalibRegression(b, a)
-# #
-# print(my_reg.show_result())
-# print("constant = ", my_reg.get_intercept())
-# print("slope = ", my_reg.get_slope())
