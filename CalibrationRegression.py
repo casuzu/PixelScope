@@ -21,3 +21,7 @@ class MyCalibRegression:
     def get_slope(self):
         return self.__result.params[1]
 
+    def get_R_squared(self):
+        return self.__result.rsquared
+
+
