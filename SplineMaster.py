@@ -424,6 +424,7 @@ class MySpline:
             userinput = input("How many millimeters(mm) is this line?: ")
             self.linelen_calib_measure.append(userinput)
 
+
             #Display the image
             self.show_image()
             self.calibration_line_complete = False
@@ -433,7 +434,11 @@ class MySpline:
                 self.CALIBRATION_COMPLETE = True
                 # Start the line regression to find the relationship between pixel and mm measurements.
                 self.lreg = LinearReg(self.linelen_pixel_measure, self.linelen_calib_measure)
-                self.lreg.show_result()
+                #self.lreg.show_result()
+                print("========================")
+                print("Estimated Relationship: Y = " + str(f"{self.lreg.get_intercept():.4f}")+" + " + str(f"{self.lreg.get_slope():.4f}") + "x")
+                print("Estimated Accuracy: " + str(f"{self.lreg.get_R_squared()*100:.2f}") + "%")
+                print("========================")
                 #Get and store the slope and intercept of the line.
                 self.__calib_slope = self.lreg.get_slope()
                 self.__calib_intercept= self.lreg.get_intercept()
