@@ -36,9 +36,7 @@ def img_up_resizer(image):
 def main_menu():
     print("What mode would you like to run?:")
     print("Press l for Straight Line Mode.")
-    print("Press p for Point Mode.")
     print("Press c for Calibration Mode.")
-    print("Press u to undo added point(s).")
     print("Press q to close the application.")
     print("Press m to see this menu again.")
     global select_main_menu
