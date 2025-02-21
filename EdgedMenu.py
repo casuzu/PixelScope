@@ -1,5 +1,3 @@
-import csv
-import os
 import numpy as np
 import cv2
 import tkinter as tk
@@ -51,7 +49,7 @@ class MyEdgedImageMaker:
         self.edged_img_label = None
 
         # Define the target size (width, height)
-        self.target_size = (int(0.25 * SCREEN_WIDTH), int(0.75 * SCREEN_HEIGHT))
+        self.img_target_size = (int(0.25 * SCREEN_WIDTH), int(0.75 * SCREEN_HEIGHT))
 
         # The values for canny low and high thresholds were choosen experimentally.
         self.canny_low_threshold = 40
@@ -76,7 +74,7 @@ class MyEdgedImageMaker:
             img_selected = cv2.imread(filepath)
 
             # Resize the image
-            img_selected = cv2.resize(img_selected, self.target_size)
+            img_selected = cv2.resize(img_selected, self.img_target_size)
 
             #Convert to tkinter image
             tk_img = convert_to_tk_img(img_selected)
@@ -114,7 +112,7 @@ class MyEdgedImageMaker:
         img_selected = cv2.imread(img1_filepath)
 
         # Resize the image
-        img_selected = cv2.resize(img_selected, self.target_size)
+        img_selected = cv2.resize(img_selected, self.img_target_size)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -140,7 +138,7 @@ class MyEdgedImageMaker:
         img_selected = cv2.imread(img2_filepath)
 
         # Resize the image
-        img_selected = cv2.resize(img_selected, self.target_size)
+        img_selected = cv2.resize(img_selected, self.img_target_size)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -241,11 +239,11 @@ img_btn_upload = tk.Button(button_frame, text="UPLOAD IMAGE", command=edged_img_
 img_btn_upload.pack(pady=25, fill=tk.X)
 
 #Show load image 1 button and set the button position
-img1_btn_load = tk.Button(button_frame, text="LOAD IMAGE 1", command=edged_img_maker.load_image1)
+img1_btn_load = tk.Button(button_frame, text="LOAD ORIGINAL IMAGE", command=edged_img_maker.load_image1)
 img1_btn_load.pack(pady=25, fill=tk.X)
 
 #Show load image 2 button and set the button position
-img2_btn_load = tk.Button(button_frame, text="LOAD IMAGE 2", command=edged_img_maker.load_image2)
+img2_btn_load = tk.Button(button_frame, text="LOAD CANNY IMAGE", command=edged_img_maker.load_image2)
 img2_btn_load.pack(pady=25, fill=tk.X)
 
 img_btn_continue = tk.Button(button_frame, text="CONTINUE", command=close_window)
