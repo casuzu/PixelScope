@@ -1,7 +1,10 @@
 import cv2, csv
+from PIL import Image
+import os
 from SplineMaster import MySpline
 import tkinter as tk
 import EdgedMenu
+
 
 
 root = tk.Tk()
@@ -21,15 +24,35 @@ def send_to_file(coordinates, file_name):
         csv_writer.writerows(coordinates)
     csv_file.close()
 
+def save_analysis_img(save_img, img_name, save_path):
+    try:
+        # Remove potential surrounding quotes
+        save_path = save_path.strip('"')
+
+        modified_save_path = save_path.replace("\\", "/")
+        # Ensure the save path exists
+        os.makedirs(modified_save_path, exist_ok=True)
+
+        # Construct the full file path
+        full_file_path = os.path.join(modified_save_path, img_name + ".jpeg")
+
+        # Save the image as JPEG
+        save_img.convert("RGB").save(full_file_path, "jpeg")
+        print(f"Image saved as {full_file_path}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 def images_same_size(img1, img2):
     if img1.shape == img2.shape:
         return True
     else:
         return False
 
-def img_up_resizer(image):
-    new_width = int(0.25 * SCREEN_WIDTH)
-    new_height = int(0.75 * SCREEN_HEIGHT)
+def img_up_resizer(image, img_screen_percent):
+    new_width = int(img_screen_percent * SCREEN_HEIGHT)
+    new_height = new_width
     new_size = (new_width, new_height)
     resized_img = cv2.resize(image, new_size, interpolation=cv2.INTER_LINEAR)
     return resized_img
@@ -44,14 +67,15 @@ def main_menu():
 
 
 
-#file_path1 = 'C:/Users/jcasu/OneDrive/Documents/Years/Spring/Spring 2024/Dr.Persad/Drop Images/Cylinder image 5.png'
-#file_path2 = 'C:/Users/jcasu/OneDrive/Documents/Years/Spring/Spring 2024/Dr.Persad/Drop Images/edged Images/edged cylinder image 2.jpg'
 
-img, img_edged = EdgedMenu.original_img, EdgedMenu.final_edged_img
+#img_screen_ratio = EdgedMenu.IMG_SCREEN_RATIO
+img = EdgedMenu.original_img_filepath
+img_edged = EdgedMenu.final_edged_img_filepath
 
-img = img_up_resizer(cv2.imread(img))
-img_edged = img_up_resizer(cv2.imread(img_edged))
-
+img = cv2.imread(img)
+img_edged = cv2.imread(img_edged)
+print("img.shape = ", img.shape)
+print("img_edged.shape = ", img_edged.shape)
 
 if images_same_size(img_edged, img):
     spline = MySpline(img_edged, img)
@@ -91,7 +115,9 @@ if images_same_size(img_edged, img):
                 print("========================")
                 print("CALIBRATION MODE")
                 print("========================")
-                print("Enter", spline.TOTAL_CALIBRATION_NUM, "entries to calibrate the pixel to mm relationship.")
+
+                spline.total_calibration_num = int(input("Please enter the number(integer) of calibration lines in order"
+                                                         " to calibrate the pixel to mm relationship:  "))
                 print("Press the 'm' key after 'CALIBRATION COMPLETED' message to return to the main menu.")
                 spline.modeselect = "Calibration"
                 spline.mode()
@@ -100,7 +126,6 @@ if images_same_size(img_edged, img):
         # Close program with keyboard 'q'
         elif key == ord('q') or key == ord('Q'):
             if spline.get_lines():
-                #points_list = spline.get_points_coord()
                 lines_list = [[i.starting_point, i.ending_point] for i in spline.get_lines()]
                 print("Lines = {}".format(lines_list))
 
@@ -118,7 +143,10 @@ if images_same_size(img_edged, img):
                 send_to_file(vertic_lines_list, "Vertical_Lines")
                 send_to_file(horizon_lines_list, "Horizontal_Lines")
 
+            #analy_img_name = input("What name would you like to give the analysis image?:")
+            #analy_img_location = input("Where do you want to store the analysis image?:")
 
+            #save_analysis_img(spline.clone, analy_img_name, analy_img_location)
             cv2.destroyAllWindows()
             exit(0)
 else:
