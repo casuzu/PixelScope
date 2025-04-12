@@ -56,7 +56,7 @@ class MySpline:
         #Used in line calibration calculation.
         #8 is used as it is the minimum number of sample that statsmodel will allow before throwing a fit.
         self.calibration_lines = []
-        self.TOTAL_CALIBRATION_NUM = 4 #maximum points set for the regression
+        self.total_calibration_num = 4 #maximum points set for the regression
         self.calibration_line_complete = False #Flag for when calibration line has been completely drawn.
         self.CALIBRATION_COMPLETE = False #Flag for when calibration of the measurements is complete.
         self.linelen_calib_measure = []
@@ -71,7 +71,7 @@ class MySpline:
         # Used in line zoom calculation
         self.zoom = 1
         self.MIN_ZOOM = 1
-        self.MAX_ZOOM = 5
+        self.MAX_ZOOM = 7
         self.full_zoomed_OUT_flag = True
         self.full_zoomed_IN_flag = False
         self.zoom_slopex = None
@@ -292,9 +292,9 @@ class MySpline:
 
 
             # Draw the point created on the clone, trackbar and original image.
-            cv2.circle(self.clone, (x, y), 2, [0, 195, 225], 2)
-            cv2.circle(self.trackbar_img, (x, y), 2, [0, 195, 225], 2)
-            cv2.circle(self.original_image, (x, y), 2, [0, 195, 225], 2)
+            cv2.circle(self.clone, (x, y), 1, [0, 195, 225], 2)
+            cv2.circle(self.trackbar_img, (x, y), 1, [0, 195, 225], 2)
+            cv2.circle(self.original_image, (x, y), 1, [0, 195, 225], 2)
 
             self.show_image()
 
@@ -394,9 +394,9 @@ class MySpline:
             self.points.append(MyPoint([x, y]))
 
             # Draw the point created on the clone, trackbar and original image.
-            cv2.circle(self.clone, self.points[-1].point_coord, 2, self.point_color, 2)
-            cv2.circle(self.trackbar_img, self.points[-1].point_coord, 2, self.point_color, 2)
-            cv2.circle(self.original_image, self.points[-1].point_coord, 2, self.point_color, 2)
+            cv2.circle(self.clone, self.points[-1].point_coord, 1, self.point_color, 2)
+            cv2.circle(self.trackbar_img, self.points[-1].point_coord, 1, self.point_color, 2)
+            cv2.circle(self.original_image, self.points[-1].point_coord, 1, self.point_color, 2)
 
             self.show_image()
             #print the coordinates of the point to screen.
@@ -430,7 +430,7 @@ class MySpline:
             self.calibration_line_complete = False
 
             #If the total number of calibration lines is equal to the maximum points set for the regression...
-            if len(self.linelen_calib_measure) == self.TOTAL_CALIBRATION_NUM:
+            if len(self.linelen_calib_measure) == self.total_calibration_num:
                 self.CALIBRATION_COMPLETE = True
                 # Start the line regression to find the relationship between pixel and mm measurements.
                 self.lreg = LinearReg(self.linelen_pixel_measure, self.linelen_calib_measure)
