@@ -127,7 +127,7 @@ class MySpline:
         # print(f'line_id:{closest_line_ID}')
 
         # If the mouse left button is held down and the mouse is close to a line...
-        if event == cv2.EVENT_LBUTTONDOWN and mouse_close_to_a_line:
+        if event == cv2.EVENT_LBUTTONDOWN and event == cv2.EVENT_MOUSEMOVE and mouse_close_to_a_line:
             # Flag set for conditions to mouse drag.
             self.mouse_dragging = True
 
