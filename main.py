@@ -61,20 +61,17 @@ def img_up_resizer(image, img_screen_percent):
 
 def main_menu():
     print("What mode would you like to run?:")
-    print("Press l for Straight Line Mode.")
-    print("Press c for Calibration Mode.")
-    print("Press q to close the application.")
-    print("Press m to see this menu again.")
+    print("Press the 'l' key for Straight Line Mode.")
+    print("Press 'c' key for Calibration Mode.")
+    print("Press 'q' key to close the application.")
+    print("Press 'm' key to see this menu again.")
     global select_main_menu
     select_main_menu = False
 
 
-# img_screen_ratio = EdgedMenu.IMG_SCREEN_RATIO
-img = EdgedMenu.original_img_filepath
-img_edged = EdgedMenu.final_edged_img_filepath
+img = EdgedMenu.original_img
+img_edged = EdgedMenu.final_edged_img
 
-img = cv2.imread(img)
-img_edged = cv2.imread(img_edged)
 print("img.shape = ", img.shape)
 print("img_edged.shape = ", img_edged.shape)
 
