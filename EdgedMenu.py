@@ -70,8 +70,8 @@ class MyEdgedImageMaker:
         # 1/6 of the screenwidth is used as the height of the image
         target_height = resize_factor * target_width
 
-        print("resize_factor = ", resize_factor, "\ntarget_height = ",
-              target_height, "\ntarget_width = ", target_width)
+        #print("resize_factor = ", resize_factor, "\ntarget_height = ",
+        #      target_height, "\ntarget_width = ", target_width)
         self.img_target_size = (int(target_width), int(target_height))
 
     # Load image from file upload and store as tkinter image
@@ -124,12 +124,19 @@ class MyEdgedImageMaker:
             # Use default image if file not found
             img1_filepath = self.file_path_default
 
+
+
         # Get image from file path
         img_selected = cv2.imread(img1_filepath)
 
-        self.img_target_size = (int(img_selected[0]), int(img_selected[1]))
+        self.target__resizer(img_selected.shape[0], img_selected.shape[1])
+
         # Resize the image
         img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+
+        #self.img_target_size = (int(img_selected.shape[0]), int(img_selected.shape[1]))
+        # Resize the image
+        #img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -154,8 +161,13 @@ class MyEdgedImageMaker:
         # Get image from file path
         img_selected = cv2.imread(img2_filepath)
 
+        self.target__resizer(img_selected.shape[0], img_selected.shape[1])
+
         # Resize the image
-        img_selected = cv2.resize(img_selected, self.img_target_size)
+        img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+
+        # Resize the image
+        #img_selected = cv2.resize(img_selected, self.img_target_size)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -187,17 +199,36 @@ class MyEdgedImageMaker:
         self.edged_img_label.config(image=edged_img)
         self.edged_img_label.image = edged_img  # Keep a reference
 
-    def get_original_img_filepath(self):
-        if self.img_file_path:
-            return self.img_file_path
-        else:
-            return self.file_path_default
+    def get_original_img(self):
 
-    def get_edged_img_filepath(self):
-        if self.edged_img_file_path:
-            return self.edged_img_file_path
+        if self.img_file_path:
+            img_filepath = self.img_file_path
         else:
-            return self.file_path_default
+            img_filepath = self.file_path_default
+
+        img_selected = cv2.imread(img_filepath)
+
+        self.target__resizer(img_selected.shape[0], img_selected.shape[1])
+
+        # Resize the image
+        img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+
+        return img_selected
+
+    def get_edged_img(self):
+        if self.edged_img_file_path:
+            img_filepath = self.edged_img_file_path
+        else:
+            img_filepath = self.file_path_default
+
+        img_selected = cv2.imread(img_filepath)
+
+        self.target__resizer(img_selected.shape[0], img_selected.shape[1])
+
+        # Resize the image
+        img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+
+        return img_selected
 
     def save_resized_uploaded_img(self):
         # Open file dialog to choose the location and file name
@@ -269,7 +300,7 @@ img_btn_upload = tk.Button(button_frame, text="UPLOAD NEW IMAGE", command=edged_
 img_btn_upload.pack(pady=25, fill=tk.X)
 
 # Show load image 1 button and set the button position
-img1_btn_load = tk.Button(button_frame, text="LOAD SAVED IMAGE", command=edged_img_maker.load_image1)
+img1_btn_load = tk.Button(button_frame, text="LOAD SAVED RESIZED IMAGE", command=edged_img_maker.load_image1)
 img1_btn_load.pack(pady=25, fill=tk.X)
 
 # Show load image 2 button and set the button position
@@ -291,5 +322,5 @@ root.bind("<Q>", close_window)
 root.mainloop()
 
 # Save the final result
-original_img_filepath = edged_img_maker.get_original_img_filepath()
-final_edged_img_filepath = edged_img_maker.get_edged_img_filepath()
+original_img = edged_img_maker.get_original_img()
+final_edged_img = edged_img_maker.get_edged_img()
