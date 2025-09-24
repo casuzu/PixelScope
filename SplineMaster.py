@@ -89,7 +89,10 @@ class MySpline:
         self.trackbar_value = 0
 
         # Used in mouse dragging
+        self.start_drag = False
         self.mouse_dragging = False
+        self.one_line_picked_for_drag = False
+        self.closest_mouse_line_id = -1
 
         self.IMG_LENGTH, self.IMG_WIDTH = self.edged_image.shape[0], self.edged_image.shape[1]  # 732, 402
 
@@ -120,6 +123,7 @@ class MySpline:
         self.zoom_img(event, x, y, flags)
 
     def __mouse_drag(self, event, x, y, flags, parameters):
+
         # Finds out if the mouse is close to a drawn line and what line it is.
         mouse_close_to_a_line, closest_line_ID = self.mouse_is_close_to_a_line(x, y)
 
@@ -127,25 +131,33 @@ class MySpline:
         # print(f'line_id:{closest_line_ID}')
 
         # If the mouse left button is held down and the mouse is close to a line...
-        if event == cv2.EVENT_LBUTTONDOWN and event == cv2.EVENT_MOUSEMOVE and mouse_close_to_a_line:
+        if event == cv2.EVENT_LBUTTONDOWN and mouse_close_to_a_line:
             # Flag set for conditions to mouse drag.
+            self.start_drag = True
+
+        # if mouse is moved and the dragging conditions are met...
+        elif event == cv2.EVENT_MOUSEMOVE and self.start_drag:
             self.mouse_dragging = True
 
-        # if mouse is moved...
-        elif event == cv2.EVENT_MOUSEMOVE:
-            # and the dragging conditions are met...
-            if self.mouse_dragging:
-                # Allow the line to be moved to a new position.
-                self.__line_drag(x, y, closest_line_ID)
+            # If one line selected is being dragged,
+            # dont allow another line to be able to be dragged.
+            self.one_line_picked_for_drag = True
+
+            # Allow the line to be moved to a new position.
+            self.__line_drag(x, y, closest_line_ID)
 
         # If the mouse left button is released...
         elif event == cv2.EVENT_LBUTTONUP:
+
+            self.one_line_picked_for_drag = False
+            self.start_drag = False
             # Turn off mouse dragging.
             self.mouse_dragging = False
 
     # Function to determine if a mouse is close to a line
     # and what line it is.
     def mouse_is_close_to_a_line(self, mouseX, mouseY):
+
         # Hyperparameter to show the range around a line that
         # the mouse should be within to flag that the mouse is close emough
         # to said line.
@@ -153,35 +165,39 @@ class MySpline:
 
         # If there is at least 1 line drawn...
         if len(self.lines) >= 1:
-            # Create a temp line id and temp shortest distance between the mouse and the line.
-            closest_mouse_line_id = -1
-            shortest_mouse_line_proximity = 10000
 
-            # Find the line closest to the mouse
-            for line in self.lines:
-                # Gets the x and y coordinates of the starting and endind points of the line.
-                x1, y1 = line.starting_point[0], line.starting_point[1]
-                x2, y2 = line.ending_point[0], line.ending_point[1]
+            # If no line is currently being dragged...
+            if not self.one_line_picked_for_drag:
+                # Create a temp shortest distance between the mouse and the line.
+                shortest_mouse_line_proximity = 10000
 
-                # Calculate the distance between a point and a line by setting up a
-                # traingle between the line and the mouse point and calcualte the height at
-                # any given mouse coordinate.
-                numerator = math.fabs(mouseX * (y2 - y1) - mouseY * (x2 - x1) + x2 * y1 - y2 * x1)
-                denominator = math.sqrt(math.pow((y2 - y1), 2) + math.pow((x2 - x1), 2))
-                current_mouse_line_proximity = int(numerator / denominator)
+                # Find the line closest to the mouse
+                for line in self.lines:
+                    # Gets the x and y coordinates of the starting and endind points of the line.
+                    x1, y1 = line.starting_point[0], line.starting_point[1]
+                    x2, y2 = line.ending_point[0], line.ending_point[1]
 
-                # Get the line id of the line that is closest to the mouse and its distance away from the mouse
-                if shortest_mouse_line_proximity > current_mouse_line_proximity:
-                    shortest_mouse_line_proximity = current_mouse_line_proximity
-                    closest_mouse_line_id = line.get_id()
+                    # Calculate the distance between a point and a line by setting up a
+                    # traingle between the line and the mouse point and calcualte the height at
+                    # any given mouse coordinate.
+                    numerator = math.fabs(mouseX * (y2 - y1) - mouseY * (x2 - x1) + x2 * y1 - y2 * x1)
+                    denominator = math.sqrt(math.pow((y2 - y1), 2) + math.pow((x2 - x1), 2))
+                    current_mouse_line_proximity = int(numerator / denominator)
 
-            # Return if the mouse is within the accepted line boundary,
-            # and the line id of the line it is closest to.
-            if shortest_mouse_line_proximity <= SHORTEST_MOUSE_TO_LINE_PROXIMITY_RANGE:
-                # print("shortest_mouse_line_proximity: ", shortest_mouse_line_proximity)
-                return True, closest_mouse_line_id
+                    # Get the line id of the line that is closest to the mouse and its distance away from the mouse
+                    if shortest_mouse_line_proximity > current_mouse_line_proximity:
+                        shortest_mouse_line_proximity = current_mouse_line_proximity
+                        self.closest_mouse_line_id = line.get_id()
+
+                # Return if the mouse is within the accepted line boundary,
+                # and the line id of the line it is closest to.
+                if shortest_mouse_line_proximity <= SHORTEST_MOUSE_TO_LINE_PROXIMITY_RANGE:
+                    # print("shortest_mouse_line_proximity: ", shortest_mouse_line_proximity)
+                    return True, self.closest_mouse_line_id
+                else:
+                    return False, self.closest_mouse_line_id
             else:
-                return False, closest_mouse_line_id
+                return True, self.closest_mouse_line_id
         else:  # If no line is drawn, the mouse proximity as false and the line id as none.
             return False, None
 
@@ -260,8 +276,9 @@ class MySpline:
         self.show_image()
 
     def __draw_line(self, event, x, y, calibration_mode=False):
-        # Record starting (x,y) coordinates on left mouse button click
-        if event == cv2.EVENT_LBUTTONDOWN and not self.mouse_dragging:
+        # Record starting (x,y) coordinates on left mouse button double click
+        if event == cv2.EVENT_LBUTTONDBLCLK:
+            print("LINE DOT 1")
             self.line_complete += 1
             if self.line_complete == 1:
                 # Create the point to make a line
@@ -275,93 +292,90 @@ class MySpline:
             self.show_image()
 
         # Record ending (x,y) coordinates on left mouse bottom release
-        elif event == cv2.EVENT_LBUTTONUP:
 
-            if self.line_complete == 2:
+        if self.line_complete == 2:
+            # Set the ending point of the line
+            self.line_ending_point = [x, y]
 
-                # Set the ending point of the line
-                self.line_ending_point = [x, y]
+            # Get the line orientation
+            self.line_orientation_angle, self.line_orient = line_orientation(self.line_starting_point,
+                                                                             self.line_ending_point)
 
-                # Get the line orientation
-                self.line_orientation_angle, self.line_orient = line_orientation(self.line_starting_point,
-                                                                                 self.line_ending_point)
+            # Calculate and Get the length of the line
+            self.line_distance = math.dist(self.line_starting_point, self.line_ending_point)
 
-                # Calculate and Get the length of the line
-                self.line_distance = math.dist(self.line_starting_point, self.line_ending_point)
+            old_starting_point = self.line_starting_point.copy()
+            old_ending_point = self.line_ending_point.copy()
 
-                old_starting_point = self.line_starting_point.copy()
-                old_ending_point = self.line_ending_point.copy()
-
-                if self.line_orient == "Vertical":
-                    # Changes the line color
-                    self.line_color = self.vline_color
-                    # Ensures the vertical lines draws from the top and is contained in the screen
-                    # If the user draws the line from the starting to the ending point
-                    if self.line_starting_point[1] < self.line_ending_point[1]:
-                        # Draw the line
-                        self.line_ending_point[1] = int(self.line_starting_point[1] + self.line_distance)
-
-                    else:
-                        # Draw the line backwards
-                        self.line_ending_point[1] = int(self.line_starting_point[1] - self.line_distance)
-
-                    # Match the x-axis of the starting and ending points of the lines
-                    self.line_ending_point[0] = self.line_starting_point[0]
+            if self.line_orient == "Vertical":
+                # Changes the line color
+                self.line_color = self.vline_color
+                # Ensures the vertical lines draws from the top and is contained in the screen
+                # If the user draws the line from the starting to the ending point
+                if self.line_starting_point[1] < self.line_ending_point[1]:
+                    # Draw the line
+                    self.line_ending_point[1] = int(self.line_starting_point[1] + self.line_distance)
 
                 else:
+                    # Draw the line backwards
+                    self.line_ending_point[1] = int(self.line_starting_point[1] - self.line_distance)
 
-                    # Changes the line color
-                    self.line_color = self.hline_color
-                    # Ensures the horizontal lines draws from the side and is contained in the screen
-                    # If the user draws the line from the starting to the ending point
-                    if self.line_starting_point[0] < self.line_ending_point[0]:
-                        self.line_ending_point[0] = int(self.line_starting_point[0] + self.line_distance)
-                    else:
-                        # Draw the line backwards
-                        self.line_ending_point[0] = int(self.line_starting_point[0] - self.line_distance)
+                # Match the x-axis of the starting and ending points of the lines
+                self.line_ending_point[0] = self.line_starting_point[0]
 
-                    # Match the y-axis of the starting and ending points of the lines
-                    self.line_ending_point[1] = self.line_starting_point[1]
+            else:
 
-                # Draw the line created on the clone, trackbar and original image.
-                cv2.line(self.clone, self.line_starting_point, self.line_ending_point, self.line_color, 2)
-                cv2.line(self.trackbar_img, self.line_starting_point, self.line_ending_point, self.line_color, 2)
-                cv2.line(self.original_image, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+                # Changes the line color
+                self.line_color = self.hline_color
+                # Ensures the horizontal lines draws from the side and is contained in the screen
+                # If the user draws the line from the starting to the ending point
+                if self.line_starting_point[0] < self.line_ending_point[0]:
+                    self.line_ending_point[0] = int(self.line_starting_point[0] + self.line_distance)
+                else:
+                    # Draw the line backwards
+                    self.line_ending_point[0] = int(self.line_starting_point[0] - self.line_distance)
 
-                self.show_image()
+                # Match the y-axis of the starting and ending points of the lines
+                self.line_ending_point[1] = self.line_starting_point[1]
 
+            # Draw the line created on the clone, trackbar and original image.
+            cv2.line(self.clone, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+            cv2.line(self.trackbar_img, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+            cv2.line(self.original_image, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+
+            self.show_image()
+
+            # Store the line
+            store_line = MyLine(self.line_starting_point, self.line_ending_point,
+                                self.line_orientation_angle, self.line_orient,
+                                self.line_color)
+
+            if not calibration_mode:
                 # Store the line
-                store_line = MyLine(self.line_starting_point, self.line_ending_point,
-                                    self.line_orientation_angle, self.line_orient,
-                                    self.line_color)
+                self.lines.append(store_line)
 
-                if not calibration_mode:
-                    # Store the line
-                    self.lines.append(store_line)
+                print("Line Dist(pixels) = ", self.line_distance)
 
-                    print("Line Dist(pixels) = ", self.line_distance)
+                if self.CALIBRATION_COMPLETE:
+                    print("Line Dist(mm) = ", self.__pixel_to_mm(self.line_distance))
 
-                    if self.CALIBRATION_COMPLETE:
-                        print("Line Dist(mm) = ", self.__pixel_to_mm(self.line_distance))
+                print("Angle = ", self.line_orientation_angle)
+                print(' Previous Starting: {}, Ending: {}'.format(old_starting_point, old_ending_point))
+                print('Adjusted Starting: {}, Ending: {}'.format(self.line_starting_point, self.line_ending_point))
+                print("-------------------------------------------------------------------")
+                print("-------------------------------------------------------------------")
+            else:
+                # Flag to show calibration mode is on
+                self.calibration_line_complete = True
+                self.calibration_lines.append(store_line)
 
-                    print("Angle = ", self.line_orientation_angle)
-                    print(' Previous Starting: {}, Ending: {}'.format(old_starting_point, old_ending_point))
-                    # print('Adjusted Starting: {}, Ending: {}'.format(self.lines_coordinates[-2], self.lines_coordinates[-1]))
-                    print('Adjusted Starting: {}, Ending: {}'.format(self.line_starting_point, self.line_ending_point))
-                    print("-------------------------------------------------------------------")
-                    print("-------------------------------------------------------------------")
-                else:
-                    # Flag to show calibration mode is on
-                    self.calibration_line_complete = True
-                    self.calibration_lines.append(store_line)
-
-                self.line_starting_point = None
-                self.line_ending_point = None
-                self.line_dist = None
-                self.line_color = None
-                self.line_orient = None
-                self.line_orientation_angle = None
-                self.line_complete = 0
+            self.line_starting_point = None
+            self.line_ending_point = None
+            self.line_dist = None
+            self.line_color = None
+            self.line_orient = None
+            self.line_orientation_angle = None
+            self.line_complete = 0
 
     def __draw_point(self, event, x, y):
         if event == cv2.EVENT_LBUTTONUP:
