@@ -18,6 +18,7 @@ def line_orientation(point1, point2):
     angle_deg = angle * (180 / math.pi)
 
     # Convert to a vertical or horizontal line
+    # Preference is arbitrarily set on "Vertical"
     if abs(math.sin(angle)) >= abs(math.cos(angle)):
         return angle_deg, "Vertical"
 
@@ -35,9 +36,12 @@ class MySpline:
 
         self.line_complete = 0
 
+        # Original line color
+        self.orig_line_color = (225, 0, 0, 0.9)
         # vertical and horizontal lines color respectively
         self.vline_color = (0, 0, 225, 0.5)
-        self.hline_color = (0, 225, 0, 90)
+        # alpha formally = 90
+        self.hline_color = (0, 225, 0, 0.5)
 
         # List to store start/end points for line
         self.line_starting_point = None
@@ -278,13 +282,14 @@ class MySpline:
     def __draw_line(self, event, x, y, calibration_mode=False):
         # Record starting (x,y) coordinates on left mouse button double click
         if event == cv2.EVENT_LBUTTONDBLCLK:
-            print("LINE DOT 1")
             self.line_complete += 1
             if self.line_complete == 1:
                 # Create the point to make a line
                 self.line_starting_point = [x, y]
 
-            # Draw the point created on the clone, trackbar and original image.
+            # Original line color
+            self.line_color = self.orig_line_color
+            # Draw the original line on the clone, trackbar and original image.
             cv2.circle(self.clone, (x, y), 1, [0, 195, 225], 2)
             cv2.circle(self.trackbar_img, (x, y), 1, [0, 195, 225], 2)
             cv2.circle(self.original_image, (x, y), 1, [0, 195, 225], 2)
@@ -296,6 +301,11 @@ class MySpline:
         if self.line_complete == 2:
             # Set the ending point of the line
             self.line_ending_point = [x, y]
+
+            # Draw the premodified line created on the clone, trackbar and original image.
+            cv2.line(self.clone, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+            cv2.line(self.trackbar_img, self.line_starting_point, self.line_ending_point, self.line_color, 2)
+            cv2.line(self.original_image, self.line_starting_point, self.line_ending_point, self.line_color, 2)
 
             # Get the line orientation
             self.line_orientation_angle, self.line_orient = line_orientation(self.line_starting_point,
@@ -505,6 +515,9 @@ class MySpline:
     # based on slope and intercept gotten from regression.
     def __pixel_to_mm(self, pixel_line_distance):
         return self.__calib_slope * pixel_line_distance + self.__calib_intercept
+
+    def get_edged_img(self):
+        return self.clone
 
     def get_lines(self):
         return self.lines
