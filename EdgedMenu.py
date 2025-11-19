@@ -70,7 +70,7 @@ class MyEdgedImageMaker:
         # 1/6 of the screenwidth is used as the height of the image
         target_height = resize_factor * target_width
 
-        #print("resize_factor = ", resize_factor, "\ntarget_height = ",
+        # print("resize_factor = ", resize_factor, "\ntarget_height = ",
         #      target_height, "\ntarget_width = ", target_width)
         self.img_target_size = (int(target_width), int(target_height))
 
@@ -91,7 +91,8 @@ class MyEdgedImageMaker:
         self.target__resizer(img_selected.shape[0], img_selected.shape[1])
 
         # Resize the image
-        img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+        # Interpolation = cv2.INTER_AREA best for shrinking an image
+        img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_AREA)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -124,8 +125,6 @@ class MyEdgedImageMaker:
             # Use default image if file not found
             img1_filepath = self.file_path_default
 
-
-
         # Get image from file path
         img_selected = cv2.imread(img1_filepath)
 
@@ -134,9 +133,9 @@ class MyEdgedImageMaker:
         # Resize the image
         img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
 
-        #self.img_target_size = (int(img_selected.shape[0]), int(img_selected.shape[1]))
+        # self.img_target_size = (int(img_selected.shape[0]), int(img_selected.shape[1]))
         # Resize the image
-        #img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
+        # img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -167,7 +166,7 @@ class MyEdgedImageMaker:
         img_selected = cv2.resize(img_selected, self.img_target_size, interpolation=cv2.INTER_CUBIC)
 
         # Resize the image
-        #img_selected = cv2.resize(img_selected, self.img_target_size)
+        # img_selected = cv2.resize(img_selected, self.img_target_size)
 
         # Convert to tkinter image
         tk_img = convert_to_tk_img(img_selected)
@@ -259,8 +258,8 @@ class MyEdgedImageMaker:
 
 
 # Start the loop
-# IMG_SCREEN_RATIO = 0.6875
-IMG_SCREEN_RATIO = 3 / 4.0
+# Half of the entire screen width was choosen as the images playground.
+IMG_SCREEN_RATIO = 0.5
 edged_img_maker = MyEdgedImageMaker(IMG_SCREEN_RATIO)
 
 # Use the computer's screen max width and height as display window
