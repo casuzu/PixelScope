@@ -3,12 +3,15 @@ from PIL import Image
 import os
 from SplineMaster import MySpline
 import tkinter as tk
+from tkinter import filedialog
+from PIL import Image, ImageTk
+
 import EdgedMenu
 
 root = tk.Tk()
 SCREEN_WIDTH = root.winfo_screenwidth()
 SCREEN_HEIGHT = root.winfo_screenheight()
-root.destroy()
+
 
 
 def send_to_file(coordinates, file_name):
@@ -22,6 +25,24 @@ def send_to_file(coordinates, file_name):
         csv_writer.writerows([["[X1, Y1]", "[X2, Y2]"]])
         csv_writer.writerows(coordinates)
     csv_file.close()
+
+
+def save_edged_img(save_img):
+
+    # Open file dialog to choose the location and file name
+    file_path = filedialog.asksaveasfilename(defaultextension=".png",
+                                             filetypes=[("PNG files", "*.png"),
+                                                        ("JPEG files", "*.jpg;*.jpeg"),
+                                                        ("All files", "*.*")])
+
+    # Save the image to the selected file path
+    if file_path:
+        pil_save_img = Image.fromarray(save_img)
+        try:
+            pil_save_img.save(file_path)
+            print(f"Image saved successfully to: {file_path}")
+        except Exception as e:
+            print(f"Error saving image: {e}")
 
 
 def save_analysis_img(save_img, img_name, save_path):
@@ -142,11 +163,10 @@ if images_same_size(img_edged, img):
                 send_to_file(vertic_lines_list, "Vertical_Lines")
                 send_to_file(horizon_lines_list, "Horizontal_Lines")
 
-            # analy_img_name = input("What name would you like to give the analysis image?:")
-            # analy_img_location = input("Where do you want to store the analysis image?:")
-
-            # save_analysis_img(spline.clone, analy_img_name, analy_img_location)
+                final_img = spline.get_edged_img()
+                save_edged_img(final_img)
             cv2.destroyAllWindows()
+            root.destroy()
             exit(0)
 else:
     print("Images are not the same size.")
