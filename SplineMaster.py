@@ -37,7 +37,9 @@ class MySpline:
         self.line_complete = 0
 
         # Original line color
-        self.orig_line_color = (225, 0, 0, 0.9)
+        # [0, 195, 225]
+        self.orig_line_color = (225, 100, 25, 0.9)
+
         # vertical and horizontal lines color respectively
         self.vline_color = (0, 0, 225, 0.5)
         # alpha formally = 90
@@ -287,9 +289,7 @@ class MySpline:
                 # Create the point to make a line
                 self.line_starting_point = [x, y]
 
-            # Original line color
-            self.line_color = self.orig_line_color
-            # Draw the original line on the clone, trackbar and original image.
+            # Draw the first point of the line
             cv2.circle(self.clone, (x, y), 1, [0, 195, 225], 2)
             cv2.circle(self.trackbar_img, (x, y), 1, [0, 195, 225], 2)
             cv2.circle(self.original_image, (x, y), 1, [0, 195, 225], 2)
@@ -301,6 +301,9 @@ class MySpline:
         if self.line_complete == 2:
             # Set the ending point of the line
             self.line_ending_point = [x, y]
+
+            # Original line color
+            self.line_color = self.orig_line_color
 
             # Draw the premodified line created on the clone, trackbar and original image.
             cv2.line(self.clone, self.line_starting_point, self.line_ending_point, self.line_color, 2)
