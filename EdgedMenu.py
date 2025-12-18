@@ -6,7 +6,7 @@ from PIL import Image, ImageTk
 
 # Create the display window and title
 root = tk.Tk()
-root.title("Edged Image Maker")
+root.title("PixelScope")
 
 SCREEN_WIDTH = root.winfo_screenwidth()
 SCREEN_HEIGHT = root.winfo_screenheight()
