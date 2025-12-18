@@ -11,7 +11,7 @@ import EdgedMenu
 root = tk.Tk()
 SCREEN_WIDTH = root.winfo_screenwidth()
 SCREEN_HEIGHT = root.winfo_screenheight()
-
+root.destroy()
 
 
 def send_to_file(coordinates, file_name):
@@ -28,7 +28,6 @@ def send_to_file(coordinates, file_name):
 
 
 def save_edged_img(save_img):
-
     # Open file dialog to choose the location and file name
     file_path = filedialog.asksaveasfilename(defaultextension=".png",
                                              filetypes=[("PNG files", "*.png"),
@@ -142,7 +141,6 @@ if images_same_size(img_edged, img):
                 spline.modeselect = "Calibration"
                 spline.mode()
 
-
         # Close program with keyboard 'q'
         elif key == ord('q') or key == ord('Q'):
             if spline.get_lines():
@@ -166,7 +164,6 @@ if images_same_size(img_edged, img):
                 final_img = spline.get_edged_img()
                 save_edged_img(final_img)
             cv2.destroyAllWindows()
-            root.destroy()
             exit(0)
 else:
     print("Images are not the same size.")
