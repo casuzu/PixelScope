@@ -4,6 +4,10 @@ from CalibrationRegression import MyCalibRegression as LinearReg
 from LineClass import MyLine
 from PointClass import MyPoint
 
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk
+
 
 # This function orientates the line to either a horizontal or vertical orientation.
 def line_orientation(point1, point2):
@@ -25,8 +29,19 @@ def line_orientation(point1, point2):
     return angle_deg, "Horizontal"
 
 
+def convert_to_tk_img(opencv_img):  # Converts opencv image to tkinter image
+    RGB_img = cv2.cvtColor(opencv_img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+
+    # Convert the RGB image (NumPy array) to a PIL Image
+    PIL_img = Image.fromarray(RGB_img)
+
+    # convert a PIL Image (or a NumPy array converted to a PIL Image)
+    # into a format that can be displayed in a Tkinter GUI application.
+    return ImageTk.PhotoImage(PIL_img)
+
+
 class MySpline:
-    def __init__(self, edged_img, img):
+    def __init__(self, img, edged_img, IMG_SCREEN_RATIO, root):
         self.modeselect = None
         self.img_untouched = img.copy()
         self.original_image = self.img_untouched.copy()
@@ -35,6 +50,46 @@ class MySpline:
         self.img_zoom_cache = self.edged_image.copy()  # A cache for a temp img before storing in clone
 
         self.line_complete = 0
+
+        # Window frame setup
+        self.root = root
+        self.frame = tk.Frame(self.root)
+
+        # Change the background color of the frame using configure
+        self.frame.configure(bg='lightblue')
+        self.frame.pack(fill="both", expand=True)
+
+        # Create a side frame to contain other widget frames
+        self.IMG_SCREEN_RATIO = IMG_SCREEN_RATIO
+        side_frame_width = (self.IMG_SCREEN_RATIO * self.root.winfo_screenwidth()) - 100
+        self.side_frame = tk.Frame(self.frame, width=side_frame_width, bd=1, relief="raised")
+        self.side_frame.pack(side="right", fill="y")
+        # Keep the side frame to a fixed width. With "True" the side frame shrinks to its contents
+        self.side_frame.pack_propagate(False)
+
+        # Create a sub frame for buttons on the side frame
+        self.button_frame = tk.Frame(self.side_frame)
+        self.button_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
+
+        # Create a label for the zoomed and main images on the window frame
+        self.zoom_label = tk.Label(self.frame)
+        self.zoom_label.pack(side=tk.LEFT, anchor="n")
+
+        self.main_label = tk.Label(self.frame)
+        self.main_label.pack(side=tk.LEFT, anchor="n")
+
+        # Create a sub frame for the slider on the side frame
+        self.slider_frame = tk.Frame(self.side_frame)
+        self.slider_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
+        # self.slider_frame.pack_propagate(False)
+
+        # Used to superimpose the original img over the edged img
+        self.superimpose_slider = None
+
+        # Used in slider system
+        self.trackbar_value = 0  # To keep track of the slider current value
+        self.alpha_slider_max = 100
+        self.trackbar_img = self.clone.copy()
 
         # Original line color
         # [0, 195, 225]
@@ -84,16 +139,6 @@ class MySpline:
         self.zoom_slopey = None
         self.zoom_constanty = None
 
-        # Used in trackbar system
-        self.trackbar_window_name = "Superimpose Trackbar"
-        self.TRACKBR_WINDW_WIDTH = 400
-        self.TRACKBR_WINDW_HEIGHT = 40
-        self.trackbar_created = False
-        self.trackbar_name = "Overlay"
-        self.alpha_slider_max = 100
-        self.trackbar_img = self.clone.copy()
-        self.trackbar_value = 0
-
         # Used in mouse dragging
         self.start_drag = False
         self.mouse_dragging = False
@@ -102,7 +147,8 @@ class MySpline:
 
         self.IMG_LENGTH, self.IMG_WIDTH = self.edged_image.shape[0], self.edged_image.shape[1]  # 732, 402
 
-        self.count = 0
+        # initialize the side frame widgets
+        self.side_frame_widgets_init()
 
     def mode(self):
         self.show_image()
@@ -457,7 +503,6 @@ class MySpline:
                 if self.zoom == self.MAX_ZOOM:
                     self.full_zoomed_IN_flag = True
 
-
             else:
                 self.zoom /= zoom_speed
                 self.zoom = max(self.zoom, self.MIN_ZOOM)  # zoom out
@@ -528,13 +573,13 @@ class MySpline:
     def get_points(self):
         return self.points
 
-    # when trackbar is slided by user
+    # Call when slider is used by user
     def __on_trackbar(self, val):
-        self.trackbar_value = val
+        self.trackbar_value = float(val)
 
         # when alpha is max, show original image
         # Vice-versa when beta is max, show trackbar_image
-        alpha = val / self.alpha_slider_max
+        alpha = self.trackbar_value / self.alpha_slider_max
         beta = (1.0 - alpha)
 
         # Transition from one image to another based on alpha and beta
@@ -546,23 +591,7 @@ class MySpline:
         self.clone = trackbar_transition_img.copy()
 
         # Display the transition
-        cv2.imshow('Main Image', self.clone)
-
-    def __create_trackbar(self):
-        # create the trackbar on the window
-        cv2.createTrackbar(self.trackbar_name, self.trackbar_window_name, 0, self.alpha_slider_max, self.__on_trackbar)
-
-    def show_trackbar(self):
-        # Created the named trackbar window
-        cv2.namedWindow(self.trackbar_window_name)
-        # Resize to the window to a mini size
-        cv2.resizeWindow(self.trackbar_window_name, self.TRACKBR_WINDW_WIDTH, self.TRACKBR_WINDW_HEIGHT)
-        # If the trackbar has been created once, dont create anymore trackbars
-        if not self.trackbar_created:
-            self.__create_trackbar()
-            self.trackbar_created = True
-        # Move the window to the top right side
-        cv2.moveWindow(self.trackbar_window_name, 100 + self.IMG_WIDTH + self.TRACKBR_WINDW_WIDTH, 10)
+        self.show_image()
 
     def reset_all(self):
         # Reset all global variables
@@ -586,11 +615,65 @@ class MySpline:
         self.img_zoom_cache = self.edged_image.copy()
         self.show_image()
 
-    def show_image(self):
-        # move and Display the zoom and main images
-        cv2.imshow('Zoomed Image', self.img_zoom_cache)
-        cv2.imshow('Main Image', self.clone)
-        cv2.moveWindow('Zoomed Image', 100, 10)
-        cv2.moveWindow('Main Image', 100 + self.IMG_WIDTH, 10)
+    def side_frame_widgets_init(self):
+        # Show main menu button and set the button position
+        img_btn_mMenu = tk.Button(self.button_frame, text="MAIN MENU")
+        # Puts the button on grid:side-by-side
+        img_btn_mMenu.grid(row=0, column=0, sticky="ew", padx=3)
 
-        cv2.waitKey(1)
+        # Show calibration button and set the button position
+        img_btn_calib = tk.Button(self.button_frame, text="CALIBRATION")
+        img_btn_calib.grid(row=0, column=1, sticky="ew", padx=3)
+
+        # Show line measurement button and set the button position
+        img_btn_meas = tk.Button(self.button_frame, text="MEASURE")
+        img_btn_meas.grid(row=0, column=2, sticky="ew", padx=3)
+
+        # Show export button that finishes exports and closes the program
+        img_btn_exp = tk.Button(self.button_frame,
+                                text="EXPORT",
+                                bg="#79d179",  # background
+                                activebackground="#d93904",  # when pressed
+                                )
+        img_btn_exp.grid(row=0, column=3, sticky="ew", padx=3)
+
+        # Make the buttons share space evenly
+        self.button_frame.columnconfigure(0, weight=1)  # Main menu button
+        self.button_frame.columnconfigure(1, weight=1)  # calibration button
+        self.button_frame.columnconfigure(2, weight=1)  # line measurement button
+        self.button_frame.columnconfigure(3, weight=1)  # Export button
+
+        # Text widget for slider name
+        tk.Label(
+            self.slider_frame,
+            text="SUPERIMPOSE IMAGES",
+            anchor="center"
+        ).pack(fill="x", pady=(0, 1))
+
+        # Create a slider for superimposing the original img over the edged img
+        self.superimpose_slider = tk.Scale(self.slider_frame,
+                                           from_=0, to=100,
+                                           orient='horizontal',
+                                           length=200,  # width in pixels
+                                           bd=2,
+                                           relief="raised",
+                                           troughcolor="#8fdbc7",
+                                           highlightthickness=3,
+                                           command=self.__on_trackbar)
+        self.superimpose_slider.set(0)
+
+        # Show the slider
+        self.superimpose_slider.pack(padx=10)
+
+    def show_image(self):
+        # convert from opencv to tk and show images
+        # --MAIN IMAGE--
+        tk_main_img = convert_to_tk_img(self.clone)
+
+        self.main_label.config(image=tk_main_img)
+        self.main_label.image = tk_main_img  # Keep a reference
+
+        # --ZOOM IMAGE--
+        tk_zoom_img = convert_to_tk_img(self.img_zoom_cache)
+        self.zoom_label.config(image=tk_zoom_img)
+        self.zoom_label.image = tk_zoom_img  # Keep a reference
