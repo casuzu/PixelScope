@@ -6,12 +6,14 @@ import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
 
-import EdgedMenu
+from EdgedMenu import MyEdgedImageMaker
 
-root = tk.Tk()
-SCREEN_WIDTH = root.winfo_screenwidth()
-SCREEN_HEIGHT = root.winfo_screenheight()
-root.destroy()
+
+def images_same_size(img1, img2):
+    if img1.shape == img2.shape:
+        return True
+    else:
+        return False
 
 
 def send_to_file(coordinates, file_name):
@@ -25,23 +27,6 @@ def send_to_file(coordinates, file_name):
         csv_writer.writerows([["[X1, Y1]", "[X2, Y2]"]])
         csv_writer.writerows(coordinates)
     csv_file.close()
-
-
-def save_edged_img(save_img):
-    # Open file dialog to choose the location and file name
-    file_path = filedialog.asksaveasfilename(defaultextension=".png",
-                                             filetypes=[("PNG files", "*.png"),
-                                                        ("JPEG files", "*.jpg;*.jpeg"),
-                                                        ("All files", "*.*")])
-
-    # Save the image to the selected file path
-    if file_path:
-        pil_save_img = Image.fromarray(save_img)
-        try:
-            pil_save_img.save(file_path)
-            print(f"Image saved successfully to: {file_path}")
-        except Exception as e:
-            print(f"Error saving image: {e}")
 
 
 def save_analysis_img(save_img, img_name, save_path):
@@ -64,11 +49,21 @@ def save_analysis_img(save_img, img_name, save_path):
         print(f"An error occurred: {e}")
 
 
-def images_same_size(img1, img2):
-    if img1.shape == img2.shape:
-        return True
-    else:
-        return False
+def save_edged_img(save_img):
+    # Open file dialog to choose the location and file name
+    file_path = filedialog.asksaveasfilename(defaultextension=".png",
+                                             filetypes=[("PNG files", "*.png"),
+                                                        ("JPEG files", "*.jpg;*.jpeg"),
+                                                        ("All files", "*.*")])
+
+    # Save the image to the selected file path
+    if file_path:
+        pil_save_img = Image.fromarray(save_img)
+        try:
+            pil_save_img.save(file_path)
+            print(f"Image saved successfully to: {file_path}")
+        except Exception as e:
+            print(f"Error saving image: {e}")
 
 
 def img_up_resizer(image, img_screen_percent):
@@ -85,85 +80,112 @@ def main_menu():
     print("Press 'c' key for Calibration Mode.")
     print("Press 'q' key to close the application.")
     print("Press 'm' key to see this menu again.")
-    global select_main_menu
-    select_main_menu = False
+    # global select_main_menu
+    # select_main_menu = False
 
 
-img = EdgedMenu.original_img
-img_edged = EdgedMenu.final_edged_img
+class MyMain:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("PixelScope")
+        self.SCREEN_WIDTH = self.root.winfo_screenwidth()
+        self.SCREEN_HEIGHT = self.root.winfo_screenheight()
+        self.root.minsize(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
 
-print("img.shape = ", img.shape)
-print("img_edged.shape = ", img_edged.shape)
+        # Use the computer's screen max width and height as display window
+        self.SCREEN_WIDTH_string = str(self.SCREEN_WIDTH)
+        self.SCREEN_HEIGHT_string = str(self.SCREEN_HEIGHT)
+        self.root.geometry(self.SCREEN_WIDTH_string + "x" + self.SCREEN_HEIGHT_string)
 
-if images_same_size(img_edged, img):
-    spline = MySpline(img_edged, img)
-    running = True
-    select_main_menu = True
+        # Half of the entire screen width was choosen as the images playground.
+        self.IMG_SCREEN_RATIO = 0.5
 
-    spline.show_image()
-    spline.show_trackbar()
+        main_menu_window = MyEdgedImageMaker(self.IMG_SCREEN_RATIO, self.root, on_continue=self.call_splinemaster)
 
-    while running:
-        key = cv2.waitKey(1)
+        self.img, self.img_edged = main_menu_window.get_final_images()
 
-        if select_main_menu or key == ord('m') or key == ord('M'):
-            main_menu()
+        print("img.shape = ", self.img.shape)
+        print("img_edged.shape = ", self.img_edged.shape)
+        self.root.mainloop()
+        self.root.destroy()
 
-        if key == ord('l') or key == ord('L'):
-            spline.reset_all()
-            print("========================")
-            print("STRAIGHT LINE")
-            print("========================")
-            spline.modeselect = "Straight Line"
-            spline.mode()
+    def close_window(self):  # Close the display window and ends the program
+        self.root.destroy()
 
-        elif key == ord('p') or key == ord('P'):
-            spline.reset_all()
-            print("POINTS")
-            spline.modeselect = "Points"
-            spline.mode()
+    def call_splinemaster(self, img, img_edged):
+        if images_same_size(img_edged, img):
+            spline = MySpline(img, img_edged, self.IMG_SCREEN_RATIO, self.root)
+            running = True
+            select_main_menu = True
 
-        elif key == ord('c') or key == ord('C'):
-            if spline.CALIBRATION_COMPLETE:  # If calibration is already done
-                select_main_menu = True  # call main menu
-                spline.CALIBRATION_COMPLETE = False  # Reset the calibration mode
-                spline.modeselect = None
-            else:
-                spline.reset_all()
-                print("========================")
-                print("CALIBRATION MODE")
-                print("========================")
+            spline.show_image()
+            running = False
 
-                spline.total_calibration_num = int(
-                    input("Please enter the number(integer) of calibration lines in order"
-                          " to calibrate the pixel to mm relationship:  "))
-                print("Press the 'm' key after 'CALIBRATION COMPLETED' message to return to the main menu.")
-                spline.modeselect = "Calibration"
-                spline.mode()
+            while running:
+                key = cv2.waitKey(1)
 
-        # Close program with keyboard 'q'
-        elif key == ord('q') or key == ord('Q'):
-            if spline.get_lines():
-                lines_list = [[i.starting_point, i.ending_point] for i in spline.get_lines()]
-                print("Lines = {}".format(lines_list))
+                if select_main_menu or key == ord('m') or key == ord('M'):
+                    main_menu()
+                    select_main_menu = False
 
-                vertic_lines_list = [[i.starting_point, i.ending_point]
-                                     for i in spline.get_lines()
-                                     if i.get_type() == "Vertical"]
+                if key == ord('l') or key == ord('L'):
+                    spline.reset_all()
+                    print("========================")
+                    print("STRAIGHT LINE")
+                    print("========================")
+                    spline.modeselect = "Straight Line"
+                    spline.mode()
 
-                horizon_lines_list = [[i.starting_point, i.ending_point]
-                                      for i in spline.get_lines()
-                                      if i.get_type() == "Horizontal"]
+                elif key == ord('p') or key == ord('P'):
+                    spline.reset_all()
+                    print("POINTS")
+                    spline.modeselect = "Points"
+                    spline.mode()
 
-                print("\nVertical Lines = {}".format(vertic_lines_list))
-                print("\nHorizontal Lines = {}".format(horizon_lines_list))
+                elif key == ord('c') or key == ord('C'):
+                    if spline.CALIBRATION_COMPLETE:  # If calibration is already done
+                        select_main_menu = True  # call main menu
+                        spline.CALIBRATION_COMPLETE = False  # Reset the calibration mode
+                        spline.modeselect = None
+                    else:
+                        spline.reset_all()
+                        print("========================")
+                        print("CALIBRATION MODE")
+                        print("========================")
 
-                send_to_file(vertic_lines_list, "Vertical_Lines")
-                send_to_file(horizon_lines_list, "Horizontal_Lines")
+                        spline.total_calibration_num = int(
+                            input("Please enter the number(integer) of calibration lines in order"
+                                  " to calibrate the pixel to mm relationship:  "))
+                        print("Press the 'm' key after 'CALIBRATION COMPLETED' message to return to the main menu.")
+                        spline.modeselect = "Calibration"
+                        spline.mode()
 
-                final_img = spline.get_edged_img()
-                save_edged_img(final_img)
-            cv2.destroyAllWindows()
-            exit(0)
-else:
-    print("Images are not the same size.")
+                # Close program with keyboard 'q'
+                elif key == ord('q') or key == ord('Q'):
+                    if spline.get_lines():
+                        lines_list = [[i.starting_point, i.ending_point] for i in spline.get_lines()]
+                        print("Lines = {}".format(lines_list))
+
+                        vertic_lines_list = [[i.starting_point, i.ending_point]
+                                             for i in spline.get_lines()
+                                             if i.get_type() == "Vertical"]
+
+                        horizon_lines_list = [[i.starting_point, i.ending_point]
+                                              for i in spline.get_lines()
+                                              if i.get_type() == "Horizontal"]
+
+                        print("\nVertical Lines = {}".format(vertic_lines_list))
+                        print("\nHorizontal Lines = {}".format(horizon_lines_list))
+
+                        send_to_file(vertic_lines_list, "Vertical_Lines")
+                        send_to_file(horizon_lines_list, "Horizontal_Lines")
+
+                        final_img = spline.get_edged_img()
+                        save_edged_img(final_img)
+                    cv2.destroyAllWindows()
+                    exit(0)
+        else:
+            print("Images are not the same size.")
+
+
+main = MyMain()
