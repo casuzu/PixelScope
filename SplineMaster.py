@@ -5,7 +5,7 @@ from LineClass import MyLine
 from PointClass import MyPoint
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import simpledialog, messagebox
 from PIL import Image, ImageTk
 
 
@@ -51,40 +51,38 @@ class MySpline:
 
         self.line_complete = 0
 
-        # Window frame setup
-        self.root = root
-        self.frame = tk.Frame(self.root)
-
-        # Change the background color of the frame using configure
-        self.frame.configure(bg='lightblue')
-        self.frame.pack(fill="both", expand=True)
-
-        # Create a side frame to contain other widget frames
         self.IMG_SCREEN_RATIO = IMG_SCREEN_RATIO
-        side_frame_width = (self.IMG_SCREEN_RATIO * self.root.winfo_screenwidth()) - 100
-        self.side_frame = tk.Frame(self.frame, width=side_frame_width, bd=1, relief="raised")
-        self.side_frame.pack(side="right", fill="y")
-        # Keep the side frame to a fixed width. With "True" the side frame shrinks to its contents
-        self.side_frame.pack_propagate(False)
 
-        # Create a sub frame for buttons on the side frame
-        self.button_frame = tk.Frame(self.side_frame)
-        self.button_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
+        # Create Tk root
+        self.root = root
+        # All frames
+        self.frame = None
+        self.side_frame = None
+        self.img_frame = None
+        self.button_frame = None
+        self.slider_frame = None
+        self.display_frame = None
 
-        # Create a label for the zoomed and main images on the window frame
-        self.zoom_label = tk.Label(self.frame)
-        self.zoom_label.pack(side=tk.LEFT, anchor="n")
+        # For Mode Buttons
+        self.ACTIVE_COLOR = "#81C784"  # green
+        self.INACTIVE_COLOR = "#E0E0E0"  # default gray
+        self.TEXT_ACTIVE = "white"
+        self.TEXT_INACTIVE = "black"
+        # Dictionary to group the mode buttons
+        self.mode_buttons = {}
 
-        self.main_label = tk.Label(self.frame)
-        self.main_label.pack(side=tk.LEFT, anchor="n")
+        # Drawing canvas
+        self.drawing_canvas = None
 
-        # Create a sub frame for the slider on the side frame
-        self.slider_frame = tk.Frame(self.side_frame)
-        self.slider_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
-        # self.slider_frame.pack_propagate(False)
+        # To save main tk image and zoom label
+        self.tk_main_img = None
+        self.zoom_label = None
 
         # Used to superimpose the original img over the edged img
         self.superimpose_slider = None
+
+        # Used to display events logs and measurement information
+        self.event_log_window = None
 
         # Used in slider system
         self.trackbar_value = 0  # To keep track of the slider current value
@@ -92,12 +90,10 @@ class MySpline:
         self.trackbar_img = self.clone.copy()
 
         # Original line color
-        # [0, 195, 225]
         self.orig_line_color = (225, 100, 25, 0.9)
 
         # vertical and horizontal lines color respectively
         self.vline_color = (0, 0, 225, 0.5)
-        # alpha formally = 90
         self.hline_color = (0, 225, 0, 0.5)
 
         # List to store start/end points for line
@@ -116,11 +112,13 @@ class MySpline:
         # Used in line calibration calculation.
         # 8 is used as it is the minimum number of sample that statsmodel will allow before throwing a fit.
         self.calibration_lines = []
-        self.total_calibration_num = 4  # maximum points set for the regression
+        self.TOTAL_CALIBRATION_NUM = None  # maximum points set for the regression
         self.calibration_line_complete = False  # Flag for when calibration line has been completely drawn.
         self.CALIBRATION_COMPLETE = False  # Flag for when calibration of the measurements is complete.
         self.linelen_calib_measure = []
         self.linelen_pixel_measure = []
+        # Used to keep one img save for undoing line drawn.
+        self.temp_calibration_img = None
 
         # used in generating the linear relationship
         # between the pixels and mm(millimeters) in real life
@@ -139,45 +137,61 @@ class MySpline:
         self.zoom_slopey = None
         self.zoom_constanty = None
 
+        # Used to track mouse click x,y position
+        self.mouse_xpos = None
+        self.mouse_ypos = None
+
+        # Used to track mouse double click x,y position
+        self.mouse_dxpos = None
+        self.mouse_dypos = None
+
         # Used in mouse dragging
         self.start_drag = False
         self.mouse_dragging = False
         self.one_line_picked_for_drag = False
         self.closest_mouse_line_id = -1
 
-        self.IMG_LENGTH, self.IMG_WIDTH = self.edged_image.shape[0], self.edged_image.shape[1]  # 732, 402
+        # initialize the all frames the main and zoom images
+        self.__frames_n_images_init()
 
         # initialize the side frame widgets
-        self.side_frame_widgets_init()
+        self.__side_frame_widgets_init()
 
-    def mode(self):
-        self.show_image()
-        cv2.setMouseCallback('Main Image', self.__mode_select)
+        # initialize the drawing canvas
+        self.__drawing_canvas_init()
+
+        # initialize mouse functions binding
+        self.__mouse_binding()
 
     # Select mode
-    def __mode_select(self, event, x, y, flags, parameters):
+    def __mode_select(self, mode_selected):
+        self.modeselect = mode_selected
+        # self.__mouse_drag(event, x, y, flags, parameters)
 
-        self.__mouse_drag(event, x, y, flags, parameters)
-
-        if self.modeselect == "Straight Line" and not self.mouse_dragging:
-            self.__draw_line(event, x, y)
+        if self.modeselect == "Straight Line":  # and not self.mouse_dragging:
+            print("Started Straight Line Measurement Mode.")
+            self.mode_instructions()
 
         elif self.modeselect == "Points":
             self.__draw_point(event, x, y)
 
         elif self.modeselect == "Calibration":
-            self.calibration_mode(event, x, y)
+            print("Started Calibration Mode.")
+            self.full_reset_all()
+            self.mode_instructions()
+            self.__calibration_mode()
+            # self.calibration_mode(event, x, y)
 
         # Clear drawing boxes on right mouse button click
-        if event == cv2.EVENT_RBUTTONDOWN:
-            self.reset_all()
+        # if event == cv2.EVENT_RBUTTONDOWN:
+        #    self.full_reset_all()
 
-        self.zoom_img(event, x, y, flags)
+        # self.zoom_img(event, x, y, flags)
 
     def __mouse_drag(self, event, x, y, flags, parameters):
 
         # Finds out if the mouse is close to a drawn line and what line it is.
-        mouse_close_to_a_line, closest_line_ID = self.mouse_is_close_to_a_line(x, y)
+        mouse_close_to_a_line, closest_line_ID = self.__mouse_is_close_to_a_line(x, y)
 
         # print(f'mouse close to line: {mouse_close_to_a_line}, line_id:{closest_line_ID}')
         # print(f'line_id:{closest_line_ID}')
@@ -208,7 +222,7 @@ class MySpline:
 
     # Function to determine if a mouse is close to a line
     # and what line it is.
-    def mouse_is_close_to_a_line(self, mouseX, mouseY):
+    def __mouse_is_close_to_a_line(self, mouseX, mouseY):
 
         # Hyperparameter to show the range around a line that
         # the mouse should be within to flag that the mouse is close emough
@@ -327,23 +341,25 @@ class MySpline:
 
         self.show_image()
 
-    def __draw_line(self, event, x, y, calibration_mode=False):
-        # Record starting (x,y) coordinates on left mouse button double click
-        if event == cv2.EVENT_LBUTTONDBLCLK:
-            self.line_complete += 1
-            if self.line_complete == 1:
-                # Create the point to make a line
-                self.line_starting_point = [x, y]
+    def __draw_line(self, calibration_mode=False):
+        # Get mouse (x,y) coordinates on left mouse button double click
+        x, y = self.mouse_dxpos, self.mouse_dypos
 
-            # Draw the first point of the line
-            cv2.circle(self.clone, (x, y), 1, [0, 195, 225], 2)
-            cv2.circle(self.trackbar_img, (x, y), 1, [0, 195, 225], 2)
-            cv2.circle(self.original_image, (x, y), 1, [0, 195, 225], 2)
+        self.line_complete += 1
+        if self.line_complete == 1:
+            # Create the point to make a line
+            self.line_starting_point = [x, y]
 
-            self.show_image()
+        # Draw the first point of the line
+        radius = 3
+        cv2.circle(self.clone, (x, y), radius, [0, 195, 225], 2)
+        cv2.circle(self.trackbar_img, (x, y), radius, [0, 195, 225], 2)
+        cv2.circle(self.original_image, (x, y), radius, [0, 195, 225], 2)
+
+        self.show_image()
 
         # Record ending (x,y) coordinates on left mouse bottom release
-
+        print("self.line_complete = ", self.line_complete)
         if self.line_complete == 2:
             # Set the ending point of the line
             self.line_ending_point = [x, y]
@@ -430,7 +446,6 @@ class MySpline:
 
             self.line_starting_point = None
             self.line_ending_point = None
-            self.line_dist = None
             self.line_color = None
             self.line_orient = None
             self.line_orientation_angle = None
@@ -449,49 +464,110 @@ class MySpline:
             # print the coordinates of the point to screen.
             print('point {}'.format(self.points[-1].point_coord))
 
-    def calibration_mode(self, event, x, y):
-        self.__draw_line(event, x, y, calibration_mode=True)
+    def __calibration_mode(self):
+        if self.TOTAL_CALIBRATION_NUM is None:
+            self.temp_calibration_img = self.clone.copy()
+            while True:
+                try:
+                    # Use Tkinter simple dialog box to get the number of calibration lines.
+                    self.TOTAL_CALIBRATION_NUM = simpledialog.askinteger(
+                        title="Number of Calibration Lines",
+                        prompt="Enter the number of calibration lines to use.\n Minimum required: 4\n"
+                               "For improved accuracy and statistical stability, 8 or more points are recommended.",
+                        parent=self.root
+                    )
+                    # If the user declines to enter a number of calibration lines...
+                    if self.TOTAL_CALIBRATION_NUM is None:
+                        # Cancel calibration mode.
+                        print("Calibration mode canceled.")
+                        messagebox.showinfo("Calibration Info", "Calibration mode canceled.")
+                        self.__update_btns_display(None)
+                        self.full_reset_all()
+                        return
+
+                    if self.TOTAL_CALIBRATION_NUM < 4:
+                        # Tkinter messagebox to show error.
+                        messagebox.showerror("Error: Invalid Calibration Input",
+                                             "A Minimum of 4 Calibration Lines is Required.")
+                    else:
+                        break
+
+                except ValueError:
+                    print(f"Error: '{self.TOTAL_CALIBRATION_NUM}' is not a valid integer.")
 
         # Do this if a line completely drawn in calibration mode
         if self.calibration_line_complete:
-            # Get the last line object in calibration_lines
-            calibration_line = self.calibration_lines[-1]
+            # For removing calibration measurements and lines.
+            remove_calibration = False
 
-            # Append the length of the calibration line
-            # self.linelen_pixel_measure.append(math.dist(self.lines_coordinates[-2], self.lines_coordinates[-1]))
-            self.linelen_pixel_measure.append(calibration_line.get_line_dist())
-
-            # Display the length of the line in pixels
-            print("Line distance in Pixels: ", self.linelen_pixel_measure[-1])
+            # Append the pixel length of the calibration line
+            self.linelen_pixel_measure.append(self.calibration_lines[-1].get_line_dist())
 
             # Get and append the line's length in mm
-            userinput = input("How many millimeters(mm) is this line?: ")
-            self.linelen_calib_measure.append(userinput)
+            real_length = simpledialog.askinteger(
+                title="Line Calibration Length",
+                prompt="Enter the real-world length of the line (mm):",
+                parent=self.root
+            )
+            # if the user cancels from entering a real length for the line...
+            if real_length is None:
+                remove_calibration = True
+            # or if the user enters a length of 0 for the line's real-world value...
+            elif real_length <= 0:
+                remove_calibration = True
+                messagebox.showerror("Error: Invalid Input",
+                                     "The Line length must be greater than 0.")
+            else:
+                # Update the the temp calibration image.
+                self.temp_calibration_img = self.clone.copy()
+                # Display the length of the line in pixels
+                print("Line distance in Pixels: ", self.linelen_pixel_measure[-1])
+                # Append the real length of the calibration line
+                self.linelen_calib_measure.append(real_length)
+                # Display the length of the line in mm
+                print("Line distance in mm: ", self.linelen_calib_measure[-1])
+                #
 
-            # Display the image
-            self.show_image()
+            if remove_calibration:
+                messagebox.showinfo("Calibration Line Canceled",
+                                    "The last drawn calibration line has been removed.")
+                # Revert the shown image to before the last line was drawn.
+                self.clone = self.temp_calibration_img.copy()
+                self.show_image()
+                # if the list is not empty...
+                if self.calibration_lines:
+                    # Remove the last added calibration line and pixel measurement.
+                    self.calibration_lines.pop()
+                if self.linelen_calib_measure:
+                    # Remove the last added pixel measurement.
+                    self.linelen_pixel_measure.pop()
+
             self.calibration_line_complete = False
 
-            # If the total number of calibration lines is equal to the maximum points set for the regression...
-            if len(self.linelen_calib_measure) == self.total_calibration_num:
-                self.CALIBRATION_COMPLETE = True
-                # Start the line regression to find the relationship between pixel and mm measurements.
-                self.lreg = LinearReg(self.linelen_pixel_measure, self.linelen_calib_measure)
-                # self.lreg.show_result()
-                print("========================")
-                print("Estimated Relationship: Y = " + str(f"{self.lreg.get_intercept():.4f}") + " + " + str(
-                    f"{self.lreg.get_slope():.4f}") + "x")
-                print("Estimated Accuracy: " + str(f"{self.lreg.get_R_squared() * 100:.2f}") + "%")
-                print("========================")
-                # Get and store the slope and intercept of the line.
-                self.__calib_slope = self.lreg.get_slope()
-                self.__calib_intercept = self.lreg.get_intercept()
-                # Reset and clear when calibraation is done.
-                self.reset_all()
-                print("CALIBRATION COMPLETED.")
-                print("Press the 'm' key to return to the main menu.")
+        if len(self.calibration_lines) + 1 <= self.TOTAL_CALIBRATION_NUM:
+            print(f"Draw Calibration line No. {len(self.calibration_lines) + 1}...")
 
-    def zoom_img(self, event, x, y, flags):
+        # If the total number of calibration lines is equal to the maximum points set for the regression...
+        if len(self.linelen_calib_measure) == self.TOTAL_CALIBRATION_NUM:
+            self.CALIBRATION_COMPLETE = True
+            # Start the line regression to find the relationship between pixel and mm measurements.
+            self.lreg = LinearReg(self.linelen_pixel_measure, self.linelen_calib_measure)
+            # self.lreg.show_result()
+            unit = "mm"
+            print("========================")
+            print(f"Estimated Relationship: 1 {unit} = " + str(f"{self.lreg.get_intercept():.4f}") + " + " + str(
+                f"{self.lreg.get_slope():.4f}") + " pixel")
+            print("Estimated Accuracy: " + str(f"{self.lreg.get_R_squared() * 100:.2f}") + "%")
+            print("========================")
+            # Get and store the slope and intercept of the line.
+            self.__calib_slope = self.lreg.get_slope()
+            self.__calib_intercept = self.lreg.get_intercept()
+            # Reset and clear when calibraation is done.
+            self.full_reset_all()
+            print("CALIBRATION COMPLETED.")
+            print("Press the 'm' key to return to the main menu.")
+
+    def __zoom_img(self, event, x, y, flags):
 
         # If Zooming in or out
         if event == cv2.EVENT_MOUSEWHEEL:
@@ -593,49 +669,116 @@ class MySpline:
         # Display the transition
         self.show_image()
 
-    def reset_all(self):
+    def full_reset_all(self):
+
         # Reset all global variables
-        self.line_starting_point = None
-        self.line_ending_point = None
-        self.line_dist = None
-        self.line_color = None
-        self.line_orient = None
-        self.line_orientation_angle = None
+        self.half_reset()
 
         self.lines = []
-
-        self.linelen_calib_measure = []
-        self.linelen_pixel_measure = []
 
         self.full_zoomed_IN_flag = False
         self.full_zoomed_OUT_flag = True
 
         self.clone = self.edged_image.copy()
+        self.trackbar_img = self.clone.copy()
         self.original_image = self.img_untouched.copy()
         self.img_zoom_cache = self.edged_image.copy()
         self.show_image()
 
-    def side_frame_widgets_init(self):
+    def half_reset(self):
+        self.line_starting_point = None
+        self.line_ending_point = None
+        self.TOTAL_CALIBRATION_NUM = None
+        self.calibration_line_complete = False
+        self.calibration_lines = []
+        self.linelen_calib_measure = []
+        self.linelen_pixel_measure = []
+
+    def __frames_n_images_init(self):
+        # Window frame setup
+        self.frame = tk.Frame(self.root)
+
+        # Change the background color of the frame using configure
+        self.frame.configure(bg='lightblue')
+        self.frame.pack(fill="both", expand=True)
+
+        # Create a side frame to contain other widget frames
+        side_frame_width = (self.IMG_SCREEN_RATIO * self.root.winfo_screenwidth()) - 100
+        self.side_frame = tk.Frame(self.frame, width=side_frame_width, bd=1, relief="raised")
+        self.side_frame.pack(side="right", fill="y")
+        # Keep the side frame to a fixed width. With "True" the side frame shrinks to its contents
+        self.side_frame.pack_propagate(False)
+
+        # Create a frame for the main and zoomed images
+        img_frame_width = (self.IMG_SCREEN_RATIO * self.root.winfo_screenwidth())
+        self.img_frame = tk.Frame(self.frame, width=img_frame_width, bd=1, bg='lightblue')
+        self.img_frame.pack(side="left", anchor="n")
+
+        # Create a sub frame for buttons on the side frame
+        self.button_frame = tk.Frame(self.side_frame)
+        self.button_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
+
+        # Create a sub frame for the slider on the side frame
+        self.slider_frame = tk.Frame(self.side_frame)
+        self.slider_frame.pack(side=tk.TOP, fill="x", padx=20, pady=(10, 5))
+
+        # Create a sub frame for the display boxes on the side frame
+        self.display_frame = tk.Frame(self.side_frame)
+        self.display_frame.pack(side=tk.TOP, fill="both", expand=True)
+
+        # Create a label for the zoomed and main images on the window frame
+        self.zoom_label = tk.Label(self.img_frame, bd=0, highlightthickness=0)
+        self.zoom_label.pack(side=tk.LEFT, padx=10)
+
+    def __drawing_canvas_init(self):
+        self.tk_main_img = convert_to_tk_img(self.clone)
+        # Create a drawing canvas to allow drawing on the main image
+        self.drawing_canvas = tk.Canvas(
+            self.img_frame,
+            width=self.tk_main_img.width(),
+            height=self.tk_main_img.height(),
+            bd=0,
+            highlightthickness=0
+        )
+        self.drawing_canvas.pack(side=tk.LEFT)
+        self.drawing_canvas.create_image(0, 0, anchor="nw", image=self.tk_main_img, tags="MAIN_IMG")
+
+    def __side_frame_widgets_init(self):
+
         # Show main menu button and set the button position
-        img_btn_mMenu = tk.Button(self.button_frame, text="MAIN MENU")
+        self.mode_buttons["Main Menu"] = tk.Button(self.button_frame,
+                                                   text="MAIN MENU",
+                                                   bg=self.INACTIVE_COLOR,
+                                                   fg=self.TEXT_INACTIVE
+                                                   )
         # Puts the button on grid:side-by-side
-        img_btn_mMenu.grid(row=0, column=0, sticky="ew", padx=3)
+        self.mode_buttons["Main Menu"].grid(row=0, column=0, sticky="ew", padx=3)
 
         # Show calibration button and set the button position
-        img_btn_calib = tk.Button(self.button_frame, text="CALIBRATION")
-        img_btn_calib.grid(row=0, column=1, sticky="ew", padx=3)
+        self.mode_buttons["Calibration"] = tk.Button(self.button_frame,
+                                                     text="CALIBRATION",
+                                                     command=lambda: self.__update_btns_display("Calibration"),
+                                                     bg=self.INACTIVE_COLOR,
+                                                     fg=self.TEXT_INACTIVE
+                                                     )
+        self.mode_buttons["Calibration"].grid(row=0, column=1, sticky="ew", padx=3)
 
         # Show line measurement button and set the button position
-        img_btn_meas = tk.Button(self.button_frame, text="MEASURE")
-        img_btn_meas.grid(row=0, column=2, sticky="ew", padx=3)
+        self.mode_buttons["Straight Line"] = tk.Button(self.button_frame,
+                                                       text="MEASURE",
+                                                       command=lambda: self.__update_btns_display("Straight Line"),
+                                                       bg=self.INACTIVE_COLOR,
+                                                       fg=self.TEXT_INACTIVE
+                                                       )
+        self.mode_buttons["Straight Line"].grid(row=0, column=2, sticky="ew", padx=3)
 
         # Show export button that finishes exports and closes the program
-        img_btn_exp = tk.Button(self.button_frame,
-                                text="EXPORT",
-                                bg="#79d179",  # background
-                                activebackground="#d93904",  # when pressed
-                                )
-        img_btn_exp.grid(row=0, column=3, sticky="ew", padx=3)
+        self.mode_buttons["Export"] = tk.Button(self.button_frame,
+                                                text="EXPORT",
+                                                bg=self.INACTIVE_COLOR,
+                                                fg=self.TEXT_INACTIVE
+                                                )
+        self.mode_buttons["Export"].grid(row=0, column=3, sticky="ew", padx=3)
 
         # Make the buttons share space evenly
         self.button_frame.columnconfigure(0, weight=1)  # Main menu button
@@ -665,13 +808,106 @@ class MySpline:
         # Show the slider
         self.superimpose_slider.pack(padx=10)
 
+        # Create a label for the event log window
+        tk.Label(
+            self.display_frame,
+            text="EVENT LOG",
+            anchor="center",
+            font=("Segoe UI", 10, "bold")
+        ).grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 0))
+
+        # Create a event log window
+        self.event_log_window = tk.Text(
+            self.display_frame,
+            height=20,
+            wrap="word",
+            state="disabled",
+            bg="black",
+            fg="white"
+        )
+        self.event_log_window.grid(row=1, column=0, sticky="nsew", padx=3)
+
+        # Create a label for the measurement log window
+        tk.Label(
+            self.display_frame,
+            text="MEASUREMENTS",
+            anchor="center",
+            font=("Segoe UI", 10, "bold")
+        ).grid(row=0, column=1, sticky="ew", padx=6, pady=(4, 0))
+
+        # Create a measurement display window
+        self.measure_window = tk.Text(
+            self.display_frame,
+            height=12,
+            wrap="word",
+            state="disabled",
+            bg="black",
+            fg="white"
+        )
+        self.measure_window.grid(row=1, column=1, sticky="nsew", padx=3)
+
+        # Make the display windows share space evenly
+        self.display_frame.columnconfigure(0, weight=1)  # Event log label & window
+        self.display_frame.columnconfigure(1, weight=1)  # Measurement log window
+
+    def __update_btns_display(self, mode):
+        # Change the button background color and text to display
+        # the current button selected.
+        for name, btn in self.mode_buttons.items():
+            if name == mode:
+                btn.config(bg=self.ACTIVE_COLOR, fg=self.TEXT_ACTIVE)
+            else:
+                btn.config(bg=self.INACTIVE_COLOR, fg=self.TEXT_INACTIVE)
+
+        # Call the mode associated the button clicked.
+        self.__mode_select(mode)
+
+    def __mouse_binding(self):
+        self.drawing_canvas.bind("<Button-1>", self.__on_mouse_left_click)
+        self.drawing_canvas.bind("<Double-Button-1>", self.__on_double_click)
+
+    def __on_mouse_left_click(self, event):
+        self.mouse_xpos = event.x
+        self.mouse_ypos = event.y
+        # print(f"Mouse clicked at canvas: ({self.mouse_xpos}, {self.mouse_ypos})")
+
+    def __on_double_click(self, event):
+        self.mouse_dxpos = event.x
+        self.mouse_dypos = event.y
+        # Update the modes called on double clicking the left mouse button.
+        self.update_modes()
+
+    def update_modes(self):
+        if self.modeselect == "Straight Line":
+            self.__draw_line()
+        if self.modeselect == "Calibration":
+            self.__draw_line(calibration_mode=True)
+            self.__calibration_mode()
+
+    def mode_instructions(self):
+        if self.modeselect == "Straight Line":
+            print("Welcome to the Straight Line Measurement Mode.\n"
+                  "This mode allows linear measurements as shown by the lines drawn.\n"
+                  "Double click anywhere on the canvas to set the coordinates of the line to be drawn.\n"
+                  "Use diagonal lines to find angles between two spaces on the canvas.\n")
+
+        elif self.modeselect == "Calibration":
+            print("Welcome to the Calibration Mode.\n"
+                  "This mode uses lines to generate an estimated"
+                  " linear relationship bewtween the image pixels and real-world values entered(in mm).\n\n")
+
     def show_image(self):
         # convert from opencv to tk and show images
         # --MAIN IMAGE--
-        tk_main_img = convert_to_tk_img(self.clone)
+        self.tk_main_img = convert_to_tk_img(self.clone)
 
-        self.main_label.config(image=tk_main_img)
-        self.main_label.image = tk_main_img  # Keep a reference
+        # Clear ONLY the tagged image
+        self.drawing_canvas.delete("MAIN_IMG")
+
+        # Update the drawing canvas
+        self.drawing_canvas.create_image(0, 0, anchor="nw", image=self.tk_main_img, tags="MAIN_IMG")
+
+        # print("img coord = ", self.drawing_canvas.coords("MAIN_IMG"))
 
         # --ZOOM IMAGE--
         tk_zoom_img = convert_to_tk_img(self.img_zoom_cache)
