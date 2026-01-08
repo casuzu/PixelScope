@@ -1,6 +1,7 @@
 import numpy as np
 import statsmodels.api as sm
 
+
 class MyCalibRegression:
     def __init__(self, pixel_arr, calib_arr):
         self.__calib_arr = np.array(calib_arr, dtype='float32')
@@ -8,7 +9,8 @@ class MyCalibRegression:
         self.__result = self.__do_regression()
 
     def __do_regression(self):
-        x = sm.add_constant(self.__pixel_arr)
+        # x = sm.add_constant(self.__pixel_arr)
+        x = self.__pixel_arr.reshape(-1, 1)
         y = self.__calib_arr
         return sm.OLS(y, x).fit()
 
@@ -16,12 +18,11 @@ class MyCalibRegression:
         print(self.__result.summary())
 
     def get_intercept(self):
-        return self.__result.params[0]
+        # return self.__result.params[0]
+        return 0
 
     def get_slope(self):
-        return self.__result.params[1]
+        return self.__result.params[0]
 
     def get_R_squared(self):
         return self.__result.rsquared
-
-
