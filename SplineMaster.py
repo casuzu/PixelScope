@@ -6,6 +6,7 @@ from PointClass import MyPoint
 
 import tkinter as tk
 from tkinter import simpledialog, messagebox
+import tkinter.font as tkfont
 from PIL import Image, ImageTk
 
 
@@ -83,11 +84,17 @@ class MySpline:
 
         # Used to display events logs and measurement information
         self.event_log_window = None
+        self.measure_window = None
 
         # Used in slider system
         self.trackbar_value = 0  # To keep track of the slider current value
         self.alpha_slider_max = 100
         self.trackbar_img = self.clone.copy()
+
+        # Font setting for display windows/Tk texts
+        self.default_font = tkfont.nametofont("TkDefaultFont")
+        self.bold_font = self.default_font.copy()
+        self.bold_font.configure(weight="bold")
 
         # Original line color
         self.orig_line_color = (225, 100, 25, 0.9)
@@ -101,8 +108,6 @@ class MySpline:
         self.line_ending_point = None
         self.line_dist = None
         self.line_color = None
-        self.line_orient = None
-        self.line_orientation_angle = None
 
         self.lines = []
 
@@ -169,14 +174,14 @@ class MySpline:
         # self.__mouse_drag(event, x, y, flags, parameters)
 
         if self.modeselect == "Straight Line":  # and not self.mouse_dragging:
-            print("Started Straight Line Measurement Mode.")
+            self.log_event("\nStarted Straight Line Measurement Mode", bold=True)
             self.mode_instructions()
 
         elif self.modeselect == "Points":
             self.__draw_point(event, x, y)
 
         elif self.modeselect == "Calibration":
-            print("Started Calibration Mode.")
+            self.log_event("\nStarted Calibration Mode", bold=True)
             self.full_reset_all()
             self.mode_instructions()
             self.__calibration_mode()
@@ -296,11 +301,11 @@ class MySpline:
                 selected_line.starting_point[0] = mouseX
                 selected_line.starting_point[1] = int(selected_line.starting_point[1] + displacement[1])
                 selected_line.ending_point[0] = mouseX
-                selected_line.ending_point[1] = int(selected_line.starting_point[1] + selected_line.get_line_dist())
+                selected_line.ending_point[1] = int(selected_line.starting_point[1] + selected_line.get_pixel_dist())
             else:
                 selected_line.starting_point[0] = int(selected_line.starting_point[0] + displacement[0])
                 selected_line.starting_point[1] = mouseY
-                selected_line.ending_point[0] = int(selected_line.starting_point[0] + selected_line.get_line_dist())
+                selected_line.ending_point[0] = int(selected_line.starting_point[0] + selected_line.get_pixel_dist())
                 selected_line.ending_point[1] = mouseY
 
             # Store the modified line in the line list.
@@ -351,7 +356,7 @@ class MySpline:
             self.line_starting_point = [x, y]
 
         # Draw the first point of the line
-        radius = 3
+        radius = 2
         cv2.circle(self.clone, (x, y), radius, [0, 195, 225], 2)
         cv2.circle(self.trackbar_img, (x, y), radius, [0, 195, 225], 2)
         cv2.circle(self.original_image, (x, y), radius, [0, 195, 225], 2)
@@ -359,7 +364,6 @@ class MySpline:
         self.show_image()
 
         # Record ending (x,y) coordinates on left mouse bottom release
-        print("self.line_complete = ", self.line_complete)
         if self.line_complete == 2:
             # Set the ending point of the line
             self.line_ending_point = [x, y]
@@ -373,27 +377,27 @@ class MySpline:
             cv2.line(self.original_image, self.line_starting_point, self.line_ending_point, self.line_color, 2)
 
             # Get the line orientation
-            self.line_orientation_angle, self.line_orient = line_orientation(self.line_starting_point,
-                                                                             self.line_ending_point)
+            line_orientation_angle, line_orient = line_orientation(self.line_starting_point,
+                                                                   self.line_ending_point)
 
             # Calculate and Get the length of the line
-            self.line_distance = math.dist(self.line_starting_point, self.line_ending_point)
+            line_distance = math.dist(self.line_starting_point, self.line_ending_point)
 
-            old_starting_point = self.line_starting_point.copy()
-            old_ending_point = self.line_ending_point.copy()
+            # old_starting_point = self.line_starting_point.copy()
+            # old_ending_point = self.line_ending_point.copy()
 
-            if self.line_orient == "Vertical":
+            if line_orient == "Vertical":
                 # Changes the line color
                 self.line_color = self.vline_color
                 # Ensures the vertical lines draws from the top and is contained in the screen
                 # If the user draws the line from the starting to the ending point
                 if self.line_starting_point[1] < self.line_ending_point[1]:
                     # Draw the line
-                    self.line_ending_point[1] = int(self.line_starting_point[1] + self.line_distance)
+                    self.line_ending_point[1] = int(self.line_starting_point[1] + line_distance)
 
                 else:
                     # Draw the line backwards
-                    self.line_ending_point[1] = int(self.line_starting_point[1] - self.line_distance)
+                    self.line_ending_point[1] = int(self.line_starting_point[1] - line_distance)
 
                 # Match the x-axis of the starting and ending points of the lines
                 self.line_ending_point[0] = self.line_starting_point[0]
@@ -405,10 +409,10 @@ class MySpline:
                 # Ensures the horizontal lines draws from the side and is contained in the screen
                 # If the user draws the line from the starting to the ending point
                 if self.line_starting_point[0] < self.line_ending_point[0]:
-                    self.line_ending_point[0] = int(self.line_starting_point[0] + self.line_distance)
+                    self.line_ending_point[0] = int(self.line_starting_point[0] + line_distance)
                 else:
                     # Draw the line backwards
-                    self.line_ending_point[0] = int(self.line_starting_point[0] - self.line_distance)
+                    self.line_ending_point[0] = int(self.line_starting_point[0] - line_distance)
 
                 # Match the y-axis of the starting and ending points of the lines
                 self.line_ending_point[1] = self.line_starting_point[1]
@@ -422,23 +426,31 @@ class MySpline:
 
             # Store the line
             store_line = MyLine(self.line_starting_point, self.line_ending_point,
-                                self.line_orientation_angle, self.line_orient,
+                                line_orientation_angle, line_orient,
                                 self.line_color)
 
             if not calibration_mode:
                 # Store the line
                 self.lines.append(store_line)
 
-                print("Line Dist(pixels) = ", self.line_distance)
-
+                # print("Line Dist(pixels) = ", line_distance)
+                self.log_measurement("-------------------------------------")
+                message = "Line Distance (pixels) = " + str(f"{line_distance:.4f}")
+                self.log_measurement(message, bullet=True)
                 if self.CALIBRATION_COMPLETE:
-                    print("Line Dist(mm) = ", self.__pixel_to_mm(self.line_distance))
+                    # print("Line Dist(mm) = ", self.__pixel_to_mm(line_distance))
+                    message = "Line Distance(mm) = " + str(f"{self.__pixel_to_mm(line_distance):.4f}")
+                    str(f"{self.lreg.get_intercept():.4f}")
+                    self.log_measurement(message, bullet=True)
 
-                print("Angle = ", self.line_orientation_angle)
-                print(' Previous Starting: {}, Ending: {}'.format(old_starting_point, old_ending_point))
-                print('Adjusted Starting: {}, Ending: {}'.format(self.line_starting_point, self.line_ending_point))
-                print("-------------------------------------------------------------------")
-                print("-------------------------------------------------------------------")
+                # print("Angle = ", line_orientation_angle)
+                message = "Angle = " + str(f"{line_orientation_angle:.2f}°")
+                self.log_measurement(message, bullet=True)
+
+                # print(' Previous Starting: {}, Ending: {}'.format(old_starting_point, old_ending_point))
+                # print('Adjusted Starting: {}, Ending: {}'.format(self.line_starting_point, self.line_ending_point))
+
+                # self.log_measurement("-------------------------------------")
             else:
                 # Flag to show calibration mode is on
                 self.calibration_line_complete = True
@@ -447,8 +459,6 @@ class MySpline:
             self.line_starting_point = None
             self.line_ending_point = None
             self.line_color = None
-            self.line_orient = None
-            self.line_orientation_angle = None
             self.line_complete = 0
 
     def __draw_point(self, event, x, y):
@@ -462,7 +472,8 @@ class MySpline:
 
             self.show_image()
             # print the coordinates of the point to screen.
-            print('point {}'.format(self.points[-1].point_coord))
+            message = 'point {}'.format(self.points[-1].point_coord)
+            self.log_measurement(message, bullet=True)
 
     def __calibration_mode(self):
         if self.TOTAL_CALIBRATION_NUM is None:
@@ -479,7 +490,7 @@ class MySpline:
                     # If the user declines to enter a number of calibration lines...
                     if self.TOTAL_CALIBRATION_NUM is None:
                         # Cancel calibration mode.
-                        print("Calibration mode canceled.")
+                        self.log_event("Calibration mode canceled.", bullet=True)
                         messagebox.showinfo("Calibration Info", "Calibration mode canceled.")
                         self.__update_btns_display(None)
                         self.full_reset_all()
@@ -493,18 +504,22 @@ class MySpline:
                         break
 
                 except ValueError:
-                    print(f"Error: '{self.TOTAL_CALIBRATION_NUM}' is not a valid integer.")
+                    messagebox.showerror("Error: Invalid Calibration Input",
+                                         f"{self.TOTAL_CALIBRATION_NUM} is not a valid integer.")
 
         # Do this if a line completely drawn in calibration mode
         if self.calibration_line_complete:
             # For removing calibration measurements and lines.
             remove_calibration = False
 
+            # Get the currrent line drawn
+            line_drawn = self.calibration_lines[-1]
+
             # Append the pixel length of the calibration line
-            self.linelen_pixel_measure.append(self.calibration_lines[-1].get_line_dist())
+            self.linelen_pixel_measure.append(line_drawn.get_pixel_dist())
 
             # Get and append the line's length in mm
-            real_length = simpledialog.askinteger(
+            real_length = simpledialog.askfloat(
                 title="Line Calibration Length",
                 prompt="Enter the real-world length of the line (mm):",
                 parent=self.root
@@ -521,12 +536,16 @@ class MySpline:
                 # Update the the temp calibration image.
                 self.temp_calibration_img = self.clone.copy()
                 # Display the length of the line in pixels
-                print("Line distance in Pixels: ", self.linelen_pixel_measure[-1])
+                # print("Line distance in Pixels: ", self.linelen_pixel_measure[-1])
+                self.log_measurement("-------------------------------------")
+                message = "Line distance in Pixels: " + str(self.linelen_pixel_measure[-1])
+                self.log_measurement(message, bullet=True)
                 # Append the real length of the calibration line
                 self.linelen_calib_measure.append(real_length)
                 # Display the length of the line in mm
-                print("Line distance in mm: ", self.linelen_calib_measure[-1])
-                #
+                # print("Line distance in mm: ", self.linelen_calib_measure[-1])
+                message = "Line distance in mm: " + str(self.linelen_calib_measure[-1])
+                self.log_measurement(message, bullet=True)
 
             if remove_calibration:
                 messagebox.showinfo("Calibration Line Canceled",
@@ -545,7 +564,8 @@ class MySpline:
             self.calibration_line_complete = False
 
         if len(self.calibration_lines) + 1 <= self.TOTAL_CALIBRATION_NUM:
-            print(f"Draw Calibration line No. {len(self.calibration_lines) + 1}...")
+            self.log_event(f"Draw Calibration line No. {len(self.calibration_lines) + 1}...",
+                           bullet=True)
 
         # If the total number of calibration lines is equal to the maximum points set for the regression...
         if len(self.linelen_calib_measure) == self.TOTAL_CALIBRATION_NUM:
@@ -554,18 +574,25 @@ class MySpline:
             self.lreg = LinearReg(self.linelen_pixel_measure, self.linelen_calib_measure)
             # self.lreg.show_result()
             unit = "mm"
-            print("========================")
-            print(f"Estimated Relationship: 1 {unit} = " + str(f"{self.lreg.get_intercept():.4f}") + " + " + str(
-                f"{self.lreg.get_slope():.4f}") + " pixel")
-            print("Estimated Accuracy: " + str(f"{self.lreg.get_R_squared() * 100:.2f}") + "%")
-            print("========================")
+            # self.log_measurement("-------------------------------------")
+            self.log_measurement("===================")
+            message = "Estimated Relationship:"
+            self.log_measurement(message)
+            message = f"1 {unit} = " + str(f"{self.lreg.get_intercept():.4f}") + " + " + str(
+                f"{self.lreg.get_slope()}") + " pixel"
+            self.log_measurement(message, bold=True)
+            # print("Estimated Accuracy: " + str(f"{self.lreg.get_R_squared() * 100:.2f}") + "%")
+            message = "Estimated Accuracy: "
+            self.log_measurement(message)
+            message = str(f"{self.lreg.get_R_squared() * 100:.2f}") + "%"
+            self.log_measurement(message, bold=True)
+            self.log_measurement("===================\n")
             # Get and store the slope and intercept of the line.
             self.__calib_slope = self.lreg.get_slope()
             self.__calib_intercept = self.lreg.get_intercept()
             # Reset and clear when calibraation is done.
             self.full_reset_all()
-            print("CALIBRATION COMPLETED.")
-            print("Press the 'm' key to return to the main menu.")
+            self.log_event("CALIBRATION COMPLETED.", bullet=True)
 
     def __zoom_img(self, event, x, y, flags):
 
@@ -813,18 +840,20 @@ class MySpline:
             self.display_frame,
             text="EVENT LOG",
             anchor="center",
-            font=("Segoe UI", 10, "bold")
+            font=self.bold_font
         ).grid(row=0, column=0, sticky="ew", padx=6, pady=(4, 0))
 
         # Create a event log window
         self.event_log_window = tk.Text(
             self.display_frame,
-            height=20,
+            height=30,
             wrap="word",
             state="disabled",
             bg="black",
             fg="white"
         )
+        self.event_log_window.tag_config("normal", font=self.default_font)
+        self.event_log_window.tag_config("bold", font=self.bold_font)
         self.event_log_window.grid(row=1, column=0, sticky="nsew", padx=3)
 
         # Create a label for the measurement log window
@@ -832,18 +861,20 @@ class MySpline:
             self.display_frame,
             text="MEASUREMENTS",
             anchor="center",
-            font=("Segoe UI", 10, "bold")
+            font=self.bold_font
         ).grid(row=0, column=1, sticky="ew", padx=6, pady=(4, 0))
 
         # Create a measurement display window
         self.measure_window = tk.Text(
             self.display_frame,
-            height=12,
+            height=30,
             wrap="word",
             state="disabled",
             bg="black",
             fg="white"
         )
+        self.measure_window.tag_config("normal", font=self.default_font)
+        self.measure_window.tag_config("bold", font=self.bold_font)
         self.measure_window.grid(row=1, column=1, sticky="nsew", padx=3)
 
         # Make the display windows share space evenly
@@ -862,6 +893,28 @@ class MySpline:
         # Call the mode associated the button clicked.
         self.__mode_select(mode)
 
+    def log_event(self, message, bullet=False, bold=False):
+        self.event_log_window.config(state="normal")
+
+        # Prefix certain messages as though it were bullet points.
+        prefix = "- " if bullet else ""
+        tag = "bold" if bold else "normal"
+
+        self.event_log_window.insert("end", prefix + message + "\n", tag)
+        self.event_log_window.see("end")  # auto-scroll
+        self.event_log_window.config(state="disabled")
+
+    def log_measurement(self, message, bullet=False, bold=False):
+        self.measure_window.config(state="normal")
+
+        # Prefix certain messages as though it were bullet points.
+        prefix = "- " if bullet else ""
+        tag = "bold" if bold else "normal"
+
+        self.measure_window.insert("end", prefix + message + "\n", tag)
+        self.measure_window.see("end")  # auto-scroll
+        self.measure_window.config(state="disabled")
+
     def __mouse_binding(self):
         self.drawing_canvas.bind("<Button-1>", self.__on_mouse_left_click)
         self.drawing_canvas.bind("<Double-Button-1>", self.__on_double_click)
@@ -869,7 +922,6 @@ class MySpline:
     def __on_mouse_left_click(self, event):
         self.mouse_xpos = event.x
         self.mouse_ypos = event.y
-        # print(f"Mouse clicked at canvas: ({self.mouse_xpos}, {self.mouse_ypos})")
 
     def __on_double_click(self, event):
         self.mouse_dxpos = event.x
@@ -886,15 +938,32 @@ class MySpline:
 
     def mode_instructions(self):
         if self.modeselect == "Straight Line":
-            print("Welcome to the Straight Line Measurement Mode.\n"
-                  "This mode allows linear measurements as shown by the lines drawn.\n"
-                  "Double click anywhere on the canvas to set the coordinates of the line to be drawn.\n"
-                  "Use diagonal lines to find angles between two spaces on the canvas.\n")
+            self.log_event("Welcome to the Straight Line Measurement Mode.",
+                           bullet=True)
+            self.log_event("This mode allows linear measurements as shown by the lines drawn.",
+                           bullet=True)
+            self.log_event("Double click anywhere on the canvas to set the coordinates of the line to be drawn.",
+                           bullet=True)
+            self.log_event("Use diagonal lines to find angles between two spaces on the canvas.",
+                           bullet=True)
+            self.log_event("The blue line is the original horizontal line drawn.",
+                           bullet=True)
+            self.log_event("The red/green line is the adjusted vertical/horizontal line.",
+                           bullet=True)
 
         elif self.modeselect == "Calibration":
-            print("Welcome to the Calibration Mode.\n"
-                  "This mode uses lines to generate an estimated"
-                  " linear relationship bewtween the image pixels and real-world values entered(in mm).\n\n")
+            self.log_event("Welcome to the Calibration Mode.",
+                           bullet=True)
+            self.log_event("This mode uses lines to generate an estimated"
+                           " linear relationship bewtween the image pixels and"
+                           "real-world values entered(in mm)",
+                           bullet=True)
+            self.log_event("Double click anywhere on the canvas to set the coordinates of the line to be drawn.",
+                           bullet=True)
+            self.log_event("The blue line is the original horizontal line drawn.",
+                           bullet=True)
+            self.log_event("The red/green line is the adjusted vertical/horizontal line.",
+                           bullet=True)
 
     def show_image(self):
         # convert from opencv to tk and show images
@@ -906,8 +975,6 @@ class MySpline:
 
         # Update the drawing canvas
         self.drawing_canvas.create_image(0, 0, anchor="nw", image=self.tk_main_img, tags="MAIN_IMG")
-
-        # print("img coord = ", self.drawing_canvas.coords("MAIN_IMG"))
 
         # --ZOOM IMAGE--
         tk_zoom_img = convert_to_tk_img(self.img_zoom_cache)
