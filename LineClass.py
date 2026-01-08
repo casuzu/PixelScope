@@ -9,18 +9,25 @@ class MyLine:
         self._id = MyLine.line_id
         self.starting_point = starting_point
         self.ending_point = ending_point
-        self._line_dist = None
+        self._pixel_dist = None
+        self._real_dist = None
         self._color = line_color
         self._type = line_type
         self._angle = angle
 
-        self.calculate_line_dist()
+        self.calculate_pixel_dist()
 
-    def calculate_line_dist(self):
-        self._line_dist = math.dist(self.starting_point, self.ending_point)
+    def calculate_pixel_dist(self):
+        self._pixel_dist = math.dist(self.starting_point, self.ending_point)
 
-    def get_line_dist(self):
-        return self._line_dist
+    def get_pixel_dist(self):
+        return self._pixel_dist
+
+    def set_real_dist(self, line_real_distance):
+        self._real_dist = line_real_distance
+
+    def get_real_dist(self):
+        return self._real_dist
 
     def set_color(self, new_color):
         self._color = new_color
