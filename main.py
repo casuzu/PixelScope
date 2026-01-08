@@ -104,8 +104,8 @@ class MyMain:
 
         self.img, self.img_edged = main_menu_window.get_final_images()
 
-        print("img.shape = ", self.img.shape)
-        print("img_edged.shape = ", self.img_edged.shape)
+        # print("img.shape = ", self.img.shape)
+        # print("img_edged.shape = ", self.img_edged.shape)
         self.root.mainloop()
         self.root.destroy()
 
