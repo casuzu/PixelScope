@@ -86,6 +86,10 @@ class MySpline:
         self.event_log_window = None
         self.measure_window = None
 
+        # To keep track of all unique messages and prevent certain
+        # messages from repeating on repeat actions
+        self._logged_messages = set()
+
         # Used in slider system
         self.trackbar_value = 0  # To keep track of the slider current value
         self.alpha_slider_max = 100
@@ -118,6 +122,7 @@ class MySpline:
         # 8 is used as it is the minimum number of sample that statsmodel will allow before throwing a fit.
         self.calibration_lines = []
         self.TOTAL_CALIBRATION_NUM = None  # maximum points set for the regression
+        self.MIN_TOTAL_CALIBRATION_NUM = 4  # The mminimum points set or regression. Chosen arbitrarily.
         self.calibration_line_complete = False  # Flag for when calibration line has been completely drawn.
         self.CALIBRATION_COMPLETE = False  # Flag for when calibration of the measurements is complete.
         self.linelen_calib_measure = []
@@ -132,15 +137,26 @@ class MySpline:
         self.__calib_intercept = None
 
         # Used in line zoom calculation
+        self.zoomed_atleast_once = False
         self.zoom = 1
         self.MIN_ZOOM = 1
-        self.MAX_ZOOM = 7
+        self.MAX_ZOOM = 10
+        self.new_width = None
+        self.new_height = None
+        self.x1_offset = None
+        self.y1_offset = None
+        self.zoomed_xpos = None
+        self.zoomed_ypos = None
         self.full_zoomed_OUT_flag = True
         self.full_zoomed_IN_flag = False
         self.zoom_slopex = None
         self.zoom_constantx = None
         self.zoom_slopey = None
         self.zoom_constanty = None
+
+        # Used in tracking if mouse was moved
+        self.mouse_moving = False
+        self._after_id = None  # stores the after() id so we can cancel it
 
         # Used to track mouse click x,y position
         self.mouse_xpos = None
@@ -190,8 +206,6 @@ class MySpline:
         # Clear drawing boxes on right mouse button click
         # if event == cv2.EVENT_RBUTTONDOWN:
         #    self.full_reset_all()
-
-        # self.zoom_img(event, x, y, flags)
 
     def __mouse_drag(self, event, x, y, flags, parameters):
 
@@ -433,24 +447,18 @@ class MySpline:
                 # Store the line
                 self.lines.append(store_line)
 
-                # print("Line Dist(pixels) = ", line_distance)
                 self.log_measurement("-------------------------------------")
                 message = "Line Distance (pixels) = " + str(f"{line_distance:.4f}")
                 self.log_measurement(message, bullet=True)
+
                 if self.CALIBRATION_COMPLETE:
-                    # print("Line Dist(mm) = ", self.__pixel_to_mm(line_distance))
                     message = "Line Distance(mm) = " + str(f"{self.__pixel_to_mm(line_distance):.4f}")
                     str(f"{self.lreg.get_intercept():.4f}")
                     self.log_measurement(message, bullet=True)
 
-                # print("Angle = ", line_orientation_angle)
                 message = "Angle = " + str(f"{line_orientation_angle:.2f}°")
                 self.log_measurement(message, bullet=True)
 
-                # print(' Previous Starting: {}, Ending: {}'.format(old_starting_point, old_ending_point))
-                # print('Adjusted Starting: {}, Ending: {}'.format(self.line_starting_point, self.line_ending_point))
-
-                # self.log_measurement("-------------------------------------")
             else:
                 # Flag to show calibration mode is on
                 self.calibration_line_complete = True
@@ -496,7 +504,7 @@ class MySpline:
                         self.full_reset_all()
                         return
 
-                    if self.TOTAL_CALIBRATION_NUM < 4:
+                    if self.TOTAL_CALIBRATION_NUM < self.MIN_TOTAL_CALIBRATION_NUM:
                         # Tkinter messagebox to show error.
                         messagebox.showerror("Error: Invalid Calibration Input",
                                              "A Minimum of 4 Calibration Lines is Required.")
@@ -535,15 +543,16 @@ class MySpline:
             else:
                 # Update the the temp calibration image.
                 self.temp_calibration_img = self.clone.copy()
+
                 # Display the length of the line in pixels
-                # print("Line distance in Pixels: ", self.linelen_pixel_measure[-1])
                 self.log_measurement("-------------------------------------")
                 message = "Line distance in Pixels: " + str(self.linelen_pixel_measure[-1])
                 self.log_measurement(message, bullet=True)
+
                 # Append the real length of the calibration line
                 self.linelen_calib_measure.append(real_length)
+
                 # Display the length of the line in mm
-                # print("Line distance in mm: ", self.linelen_calib_measure[-1])
                 message = "Line distance in mm: " + str(self.linelen_calib_measure[-1])
                 self.log_measurement(message, bullet=True)
 
@@ -594,73 +603,68 @@ class MySpline:
             self.full_reset_all()
             self.log_event("CALIBRATION COMPLETED.", bullet=True)
 
-    def __zoom_img(self, event, x, y, flags):
+    def __zoom_img(self, event):
+        x, y = event.x, event.y
+        flags = event.delta
+
+        print(self._logged_messages)
+        # Display zoom factor on event log window
+        if self.zoom != self.MIN_ZOOM and self.zoom != self.MAX_ZOOM:
+            message = f"Zoom: {int(self.zoom)}X"
+            self.log_event(message, True, repeat=False)
 
         # If Zooming in or out
-        if event == cv2.EVENT_MOUSEWHEEL:
-            zoom_speed = 1.1
-            if flags > 0:
-                self.zoom *= zoom_speed
-                self.zoom = min(self.zoom, self.MAX_ZOOM)  # zoom in
-                self.full_zoomed_OUT_flag = False
-                if self.zoom == self.MAX_ZOOM:
-                    self.full_zoomed_IN_flag = True
+        zoom_speed = 1.1
+        if flags > 0:
+            self._logged_messages.discard("MINIMUM ZOOM REACHED")
+            self.zoom *= zoom_speed
+            self.zoom = min(self.zoom, self.MAX_ZOOM)  # zoom in
+            self.full_zoomed_OUT_flag = False
 
-            else:
-                self.zoom /= zoom_speed
-                self.zoom = max(self.zoom, self.MIN_ZOOM)  # zoom out
-                self.full_zoomed_IN_flag = False
-                if self.zoom == self.MIN_ZOOM:
-                    self.full_zoomed_OUT_flag = True
+            # discard the previous max zoom factor logged message
+            discard_message = f"Zoom: {int(self.zoom) - 1}X"
+            self._logged_messages.discard(discard_message)
 
-            img = self.clone.copy()
+            if self.zoom == self.MAX_ZOOM:
+                self.full_zoomed_IN_flag = True
+                self.log_event("MAXIMUM ZOOM REACHED", True, repeat=False)
 
-            # Calculate zoomed-in image size
-            new_width = round(img.shape[1] / self.zoom)
-            new_height = round(img.shape[0] / self.zoom)
+        else:
+            self._logged_messages.discard("MAXIMUM ZOOM REACHED")
+            self.zoom /= zoom_speed
+            self.zoom = max(self.zoom, self.MIN_ZOOM)  # zoom out
+            self.full_zoomed_IN_flag = False
 
-            # Calculate offset
-            x1_offset = round(x - (x / self.zoom))
-            x2_offset = x1_offset + new_width
+            # discard the previous min zoom factor logged message
+            discard_message = f"Zoom: {int(self.zoom) + 1}X"
+            self._logged_messages.discard(discard_message)
 
-            y1_offset = round(y - (y / self.zoom))
-            y2_offset = y1_offset + new_height
+            if self.zoom == self.MIN_ZOOM:
+                self.full_zoomed_OUT_flag = True
+                self.log_event("MINIMUM ZOOM REACHED", True, repeat=False)
 
-            # Calculate zoom factors and zoom constants
-            fx = (x2_offset - x1_offset)
-            fy = (y2_offset - y1_offset)
+        img = self.clone.copy()
 
-            self.zoom_slopex = 1 / fx
-            self.zoom_constantx = -x1_offset / fx
+        # Calculate zoomed-in image size
+        self.new_width = round(img.shape[1] / self.zoom)
+        self.new_height = round(img.shape[0] / self.zoom)
 
-            self.zoom_slopey = 1 / fy
-            self.zoom_constanty = -y1_offset / fy
+        # Calculate offset
+        self.x1_offset = round(x - (x / self.zoom))
+        x2_offset = self.x1_offset + self.new_width
 
-            # Crop image
-            cropped_img = img[
-                          y1_offset: y2_offset,
-                          x1_offset: x2_offset
-                          ]
+        self.y1_offset = round(y - (y / self.zoom))
+        y2_offset = self.y1_offset + self.new_height
 
-            # Stretch image to full size
-            self.img_zoom_cache = cv2.resize(cropped_img, (self.edged_image.shape[1], self.edged_image.shape[0]))
-            self.show_image()
+        # Crop image
+        cropped_img = img[
+                      self.y1_offset: y2_offset,
+                      self.x1_offset: x2_offset
+                      ]
 
-        # if the mouse is moving and the image is fully zoomed in...
-        if event == cv2.EVENT_MOUSEMOVE and self.full_zoomed_IN_flag:
-            # Calculate the position of the mouse on the zoomed image
-            # to its supposed position on the main image.
-            zoom_factorx = self.zoom_slopex * x + self.zoom_constantx
-            zoom_factory = self.zoom_slopey * y + self.zoom_constanty
-
-            zoomed_xpos = int(zoom_factorx * self.edged_image.shape[1])  # factorx * 402 col
-            zoomed_ypos = int(zoom_factory * self.edged_image.shape[0])  # factory * 730 row
-
-            # Draw a visual tracking circle to follow the mouse's position on the zoomed image.
-            img = self.img_zoom_cache.copy()
-            cv2.circle(self.img_zoom_cache, (zoomed_xpos, zoomed_ypos), 3, (255, 255, 0), 3)
-            self.show_image()
-            self.img_zoom_cache = img.copy()
+        # Stretch image to full size
+        self.img_zoom_cache = cv2.resize(cropped_img, (self.edged_image.shape[1], self.edged_image.shape[0]))
+        self.show_image()
 
     # Converts pixel measurement to mm measurement
     # based on slope and intercept gotten from regression.
@@ -846,7 +850,7 @@ class MySpline:
         # Create a event log window
         self.event_log_window = tk.Text(
             self.display_frame,
-            height=30,
+            height=20,
             wrap="word",
             state="disabled",
             bg="black",
@@ -867,7 +871,7 @@ class MySpline:
         # Create a measurement display window
         self.measure_window = tk.Text(
             self.display_frame,
-            height=30,
+            height=20,
             wrap="word",
             state="disabled",
             bg="black",
@@ -893,7 +897,12 @@ class MySpline:
         # Call the mode associated the button clicked.
         self.__mode_select(mode)
 
-    def log_event(self, message, bullet=False, bold=False):
+    def log_event(self, message, bullet=False, bold=False, repeat=True):
+        if not repeat and message in self._logged_messages:
+            return  # already logged once
+
+        self._logged_messages.add(message)
+
         self.event_log_window.config(state="normal")
 
         # Prefix certain messages as though it were bullet points.
@@ -918,6 +927,8 @@ class MySpline:
     def __mouse_binding(self):
         self.drawing_canvas.bind("<Button-1>", self.__on_mouse_left_click)
         self.drawing_canvas.bind("<Double-Button-1>", self.__on_double_click)
+        self.drawing_canvas.bind("<Motion>", self.__on_mouse_move)
+        self.drawing_canvas.bind("<MouseWheel>", self.__on_mousewheel)
 
     def __on_mouse_left_click(self, event):
         self.mouse_xpos = event.x
@@ -928,6 +939,98 @@ class MySpline:
         self.mouse_dypos = event.y
         # Update the modes called on double clicking the left mouse button.
         self.update_modes()
+
+    def __on_mouse_move(self, event):
+        self.mouse_xpos = event.x
+        self.mouse_ypos = event.y
+        self.mouse_moving = True
+
+        # Cancel previous timer if exists.
+        # root.after_cancel is used to cancel the previous scheduled event.
+        # if not the previous scheduled event still executes and mouse_stopped function is called
+        # after 100ms.
+
+        if self._after_id is not None:
+            self.root.after_cancel(self._after_id)
+
+        # Start a new timer everytime the function: on_mouse_move() is called.
+        # self.root.after creates scheduled event in Tk that calls mouse_stopped() function,
+        # if the mouse has not moved after 100ms.
+
+        # The method self.root.after returns an identifier that can be used
+        # to cancel the scheduled event(mouse_stopped) later.
+
+        # 100ms was arbitrarily chosen.
+
+        self._after_id = self.root.after(100, self.__mouse_stopped)
+
+        #
+        if self.zoomed_atleast_once:
+            self.__calc_mouse_pos_on_zoom_img(event)
+            self.__mouse_move_on_zoom_img()
+
+    def __mouse_stopped(self):
+        self.mouse_moving = False
+        # clear after_id and allow __on_mouse_move() to cancel
+        # the previous scheduled event call.
+        self._after_id = None
+
+    def __on_mousewheel(self, event):
+        self.zoomed_atleast_once = True
+        self.__zoom_img(event)
+
+    def __mouse_move_on_zoom_img(self):
+        if self.zoomed_xpos is None or self.zoomed_ypos is None:
+            return
+
+        max_radius = 4
+        min_radius = 1
+
+        radius = max_radius + (self.zoom - self.MIN_ZOOM) * (
+                (min_radius - max_radius) / (self.MAX_ZOOM - self.MIN_ZOOM))
+        radius = int(radius)
+        # Draw a visual tracking circle to follow the mouse's position on the zoomed image.
+        img = self.img_zoom_cache.copy()
+        # inner circle
+        cv2.circle(self.img_zoom_cache,
+                   (self.zoomed_xpos, self.zoomed_ypos),
+                   radius,
+                   (0, 225, 225),
+                   -1)
+        # Draw a highlighting outer circle around the main circle
+        cv2.circle(self.img_zoom_cache,
+                   (self.zoomed_xpos, self.zoomed_ypos),
+                   radius,
+                   (0, 0, 225),
+                   2)
+        self.show_image()
+        self.img_zoom_cache = img.copy()
+
+        # Takes current mouse x, y pos and returns mouse x, y pos on zoomed img
+
+    def __calc_mouse_pos_on_zoom_img(self, event):
+        mouse_xpos, mouse_ypos = event.x, event.y
+        # Calculate offset
+        x2_offset = self.x1_offset + self.new_width
+        y2_offset = self.y1_offset + self.new_height
+
+        # Calculate zoom factors and zoom constants
+        fx = (x2_offset - self.x1_offset)
+        fy = (y2_offset - self.y1_offset)
+
+        self.zoom_slopex = 1 / fx
+        self.zoom_constantx = -self.x1_offset / fx
+
+        self.zoom_slopey = 1 / fy
+        self.zoom_constanty = -self.y1_offset / fy
+
+        # Calculate the position of the mouse on the zoomed image
+        # to its supposed position on the main image.
+        zoom_factorx = self.zoom_slopex * mouse_xpos + self.zoom_constantx
+        zoom_factory = self.zoom_slopey * mouse_ypos + self.zoom_constanty
+
+        self.zoomed_xpos = int(zoom_factorx * self.img_zoom_cache.shape[1])
+        self.zoomed_ypos = int(zoom_factory * self.img_zoom_cache.shape[0])
 
     def update_modes(self):
         if self.modeselect == "Straight Line":
