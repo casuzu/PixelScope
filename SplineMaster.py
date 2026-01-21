@@ -607,7 +607,6 @@ class MySpline:
         x, y = event.x, event.y
         flags = event.delta
 
-        print(self._logged_messages)
         # Display zoom factor on event log window
         if self.zoom != self.MIN_ZOOM and self.zoom != self.MAX_ZOOM:
             message = f"Zoom: {int(self.zoom)}X"
