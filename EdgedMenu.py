@@ -1,8 +1,15 @@
 import numpy as np
 import cv2
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
+
+
+def images_same_size(img1, img2):
+    if img1.shape == img2.shape:
+        return True
+    else:
+        return False
 
 
 def convert_to_tk_img(opencv_img):  # Converts opencv image to tkinter image
@@ -38,12 +45,17 @@ class MyEdgedImageMaker:
         self.root = root
         self.frame = tk.Frame(root)
 
+        # Half the screen to be used as images display
+        self.IMG_SCREEN_RATIO = img_screen_ratio
+
         # Change the background color of the frame using configure
         self.frame.configure(bg='lightblue')
         self.frame.pack(fill="both", expand=True)
 
-        # Half the screen to be used as images display
-        self.IMG_SCREEN_RATIO = img_screen_ratio
+        # Create tk frame for images
+        img_frame_width = (self.IMG_SCREEN_RATIO * self.root.winfo_screenwidth())
+        self.img_frame = tk.Frame(self.frame, width=img_frame_width, bd=1, bg='lightblue')
+        self.img_frame.pack(side="left", anchor="n")
 
         # Create a main frame for buttons
         self.button_frame = tk.Frame(self.frame)
@@ -81,24 +93,61 @@ class MyEdgedImageMaker:
         # show SAVE button only after an image is initially uploaded
         self.show_save_button = False
 
+        # Error code to change the error messages
+        # Error code is set as no main image uploaded.
+        self.ERROR_CODE = "NMIUD"  # No Main Image Uploaded
+
         self.run()
 
     def close_window_frame(self):  # Close the display window frame
-        self.update_final_images()
+        if self.images_fail_check():
+            return
         self.frame.destroy()
         self.on_continue(self.final_original_img, self.final_edged_img)
+
+    def images_fail_check(self):
+        self.update_final_images()
+
+        # If all images have been uploaded and are the same size
+        if self.img_file_path != self.file_path_default and self.edged_img_file_path != self.file_path_default:
+            if not images_same_size(self.final_original_img, self.final_edged_img):
+                messagebox.showerror("Image Size Mismatch",
+                                     "The images are not the same size.")
+                return True  # Check failed because images are not the same size.
+            else:
+                # Check Passed.
+                return False
+
+        if self.ERROR_CODE == "NMIUD":  # Code means No Main Image Uploaded
+            messagebox.showerror("Error", "Please upload an image.")
+            # Check failed because main image was not uploaded
+            # and is the same as the default path.
+            return True
+
+        if self.ERROR_CODE == "NEIUD":
+            if self.img_file_path != self.file_path_default:
+                messagebox.showerror("Error",
+                                     "Please upload an edge-detected image.")
+            else:
+                messagebox.showerror("Error", "Please upload an image.")
+            return True
+
+        if self.ERROR_CODE == "EINS":  # Error code: Edged Image Not Saved
+            messagebox.showerror("Error",
+                                 "Please save the edge-detected image first.")
+            # Check failed because edged image was not saved/uploaded
+            # and is the same as the default path.
+            return True
 
     def target__resizer(self, col, row):
         resize_factor = col / float(row)
         SCREEN_WIDTH = self.root.winfo_screenwidth()
 
-        # 1/3 of the screenwidth is used as the width of the image
+        # 1/4 of the screenwidth is used as the width of the image
         target_width = (self.IMG_SCREEN_RATIO * SCREEN_WIDTH) / 2.0
         # 1/6 of the screenwidth is used as the height of the image
         target_height = resize_factor * target_width
 
-        # print("resize_factor = ", resize_factor, "\ntarget_height = ",
-        #      target_height, "\ntarget_width = ", target_width)
         self.img_target_size = (int(target_width), int(target_height))
 
     # Load image from file upload and store as tkinter image
@@ -110,7 +159,14 @@ class MyEdgedImageMaker:
         # If filepath does not exist
         if not filepath:
             # Use default image if file not found
-            filepath = self.file_path_default
+            return
+
+        user_answer = messagebox.askyesno("Save Resized Image",
+                                          "Do you want to save the resized image to continue?")
+
+        if not user_answer:
+            self.ERROR_CODE = "NMIUD"  # No Main Image Uploaded
+            return
 
         # Get image from file path
         img_selected = cv2.imread(filepath)
@@ -130,7 +186,11 @@ class MyEdgedImageMaker:
         self.img_label.image = tk_img  # Keep a reference
 
         # Save the resized uploaded image
-        self.save_resized_uploaded_img()
+        if not self.save_resized_uploaded_img():
+            return
+        else:
+            # Set the error code for saving an edged image.
+            self.ERROR_CODE = "EINS"
 
         # If the image is uploaded, show the canny threshold sliders
         self.low_threshold_slider.pack(side=tk.TOP, anchor="e")
@@ -143,14 +203,18 @@ class MyEdgedImageMaker:
         # Calls edge maker after image is uploaded
         self.edge_maker(0)
 
-    def load_image1(self):
+    def load_first_image(self):
         # Open Window's File upload dialog
         img1_filepath = filedialog.askopenfilename()
 
-        # If filepath does not exist
-        if not img1_filepath:
-            # Use default image if file not found
-            img1_filepath = self.file_path_default
+        # If filepath does not exist and no main image has been uploaded.
+        if not img1_filepath and self.img_file_path == self.file_path_default:
+
+            self.ERROR_CODE = "NMIUD"  # No Main Image Uploaded
+            return
+        # Set the error code for uploading an edged image.
+        else:
+            self.ERROR_CODE = "NEIUD"  # No Edged Image Uploaded
 
         # Get image from file path
         img_selected = cv2.imread(img1_filepath)
@@ -171,14 +235,14 @@ class MyEdgedImageMaker:
         # Save the file path of the selected image
         self.img_file_path = img1_filepath
 
-    def load_image2(self):
+    def load_second_image(self):
         # Open Window's File upload dialog
         img2_filepath = filedialog.askopenfilename()
 
         # If filepath does not exist
         if not img2_filepath:
-            # Use default image if file not found
-            img2_filepath = self.file_path_default
+            self.ERROR_CODE = "NEIUD"  # No Edged Image Uploaded
+            return
 
         # Get image from file path
         img_selected = cv2.imread(img2_filepath)
@@ -222,13 +286,11 @@ class MyEdgedImageMaker:
         self.edged_img_label.image = edged_img  # Keep a reference
 
     def get_original_img(self):
+        if not self.img_file_path:
+            self.img_file_path = self.file_path_default
+            print("in get_original_img: self.img_file_path = ", self.img_file_path)
 
-        if self.img_file_path:
-            img_filepath = self.img_file_path
-        else:
-            img_filepath = self.file_path_default
-
-        img_selected = cv2.imread(img_filepath)
+        img_selected = cv2.imread(self.img_file_path)
 
         self.target__resizer(img_selected.shape[0], img_selected.shape[1])
 
@@ -238,12 +300,10 @@ class MyEdgedImageMaker:
         return img_selected
 
     def get_edged_img(self):
-        if self.edged_img_file_path:
-            img_filepath = self.edged_img_file_path
-        else:
-            img_filepath = self.file_path_default
+        if not self.edged_img_file_path:
+            self.edged_img_file_path = self.file_path_default
 
-        img_selected = cv2.imread(img_filepath)
+        img_selected = cv2.imread(self.edged_img_file_path)
 
         self.target__resizer(img_selected.shape[0], img_selected.shape[1])
 
@@ -264,6 +324,11 @@ class MyEdgedImageMaker:
             save_uploaded_pil_image.save(file_path)
             self.img_file_path = file_path
             print("Uploaded image saved at ", file_path)
+            return True
+        else:
+            self.ERROR_CODE = "NMIUD"  # No Main Image Uploaded
+            self.img_label.grid_remove()
+            return False
 
     def save_edged_img(self):
         # Open file dialog to choose the location and file name
@@ -277,7 +342,8 @@ class MyEdgedImageMaker:
             save_edged_pil_image.save(file_path)
             self.edged_img_file_path = file_path
             print("Edged image saved at ", file_path)
-            self.close_window_frame()
+        else:
+            self.ERROR_CODE = "EINS"  # Error code: Edged Image Not Saved
 
     def run(self, add_save_button=False):
         if not add_save_button:
@@ -295,23 +361,23 @@ class MyEdgedImageMaker:
             self.high_threshold_slider.set(high_threshold)
 
             # Show image and set image position
-            self.img_label = tk.Label(self.frame)
-            self.img_label.pack(side=tk.LEFT, anchor="n")
+            self.img_label = tk.Label(self.img_frame)
+            self.img_label.grid(row=0, column=0, sticky="nw")
 
             # Show edged image and set edged image position
-            self.edged_img_label = tk.Label(self.frame)
-            self.edged_img_label.pack(side=tk.LEFT, anchor="n")
+            self.edged_img_label = tk.Label(self.img_frame)
+            self.edged_img_label.grid(row=0, column=1, sticky="nw")
 
             # Show upload button and set the button position
             img_btn_upload = tk.Button(self.button_frame, text="UPLOAD NEW IMAGE", command=self.upload_new_image)
             img_btn_upload.pack(pady=25, fill=tk.X)
 
             # Show load image 1 button and set the button position
-            img1_btn_load = tk.Button(self.button_frame, text="LOAD SAVED RESIZED IMAGE", command=self.load_image1)
+            img1_btn_load = tk.Button(self.button_frame, text="LOAD SAVED RESIZED IMAGE", command=self.load_first_image)
             img1_btn_load.pack(pady=25, fill=tk.X)
 
             # Show load image 2 button and set the button position
-            img2_btn_load = tk.Button(self.button_frame, text="LOAD SAVED CANNY IMAGE", command=self.load_image2)
+            img2_btn_load = tk.Button(self.button_frame, text="LOAD SAVED CANNY IMAGE", command=self.load_second_image)
             img2_btn_load.pack(pady=25, fill=tk.X)
 
             img_btn_continue = tk.Button(self.button_frame, text="CONTINUE", command=self.close_window_frame)
@@ -329,6 +395,8 @@ class MyEdgedImageMaker:
     def update_final_images(self):
         self.final_original_img = self.get_original_img()
         self.final_edged_img = self.get_edged_img()
+        print("final original image shape = ", self.final_original_img.shape)
+        print("final edged image shape = ", self.final_edged_img.shape)
 
     def get_final_images(self):
         return self.final_original_img, self.final_edged_img
