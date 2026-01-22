@@ -133,8 +133,8 @@ class MySpline:
         # used in generating the linear relationship
         # between the pixels and mm(millimeters) in real life
         self.lreg = None
-        self.__calib_slope = None
-        self.__calib_intercept = None
+        self._calib_slope = None
+        self._calib_intercept = None
 
         # Used in line zoom calculation
         self.zoomed_atleast_once = False
@@ -173,44 +173,44 @@ class MySpline:
         self.closest_mouse_line_id = -1
 
         # initialize the all frames the main and zoom images
-        self.__frames_n_images_init()
+        self._frames_n_images_init()
 
         # initialize the side frame widgets
-        self.__side_frame_widgets_init()
+        self._side_frame_widgets_init()
 
         # initialize the drawing canvas
-        self.__drawing_canvas_init()
+        self._drawing_canvas_init()
 
         # initialize mouse functions binding
-        self.__mouse_binding()
+        self._mouse_binding()
 
     # Select mode
-    def __mode_select(self, mode_selected):
+    def _mode_select(self, mode_selected):
         self.modeselect = mode_selected
-        # self.__mouse_drag(event, x, y, flags, parameters)
+        # self._mouse_drag(event, x, y, flags, parameters)
 
         if self.modeselect == "Straight Line":  # and not self.mouse_dragging:
             self.log_event("\nStarted Straight Line Measurement Mode", bold=True)
             self.mode_instructions()
 
         elif self.modeselect == "Points":
-            self.__draw_point(event, x, y)
+            self._draw_point(event, x, y)
 
         elif self.modeselect == "Calibration":
             self.log_event("\nStarted Calibration Mode", bold=True)
             self.full_reset_all()
             self.mode_instructions()
-            self.__calibration_mode()
+            self._calibration_mode()
             # self.calibration_mode(event, x, y)
 
         # Clear drawing boxes on right mouse button click
         # if event == cv2.EVENT_RBUTTONDOWN:
         #    self.full_reset_all()
 
-    def __mouse_drag(self, event, x, y, flags, parameters):
+    def _mouse_drag(self, event, x, y, flags, parameters):
 
         # Finds out if the mouse is close to a drawn line and what line it is.
-        mouse_close_to_a_line, closest_line_ID = self.__mouse_is_close_to_a_line(x, y)
+        mouse_close_to_a_line, closest_line_ID = self._mouse_is_close_to_a_line(x, y)
 
         # print(f'mouse close to line: {mouse_close_to_a_line}, line_id:{closest_line_ID}')
         # print(f'line_id:{closest_line_ID}')
@@ -229,7 +229,7 @@ class MySpline:
             self.one_line_picked_for_drag = True
 
             # Allow the line to be moved to a new position.
-            self.__line_drag(x, y, closest_line_ID)
+            self._line_drag(x, y, closest_line_ID)
 
         # If the mouse left button is released...
         elif event == cv2.EVENT_LBUTTONUP:
@@ -241,7 +241,7 @@ class MySpline:
 
     # Function to determine if a mouse is close to a line
     # and what line it is.
-    def __mouse_is_close_to_a_line(self, mouseX, mouseY):
+    def _mouse_is_close_to_a_line(self, mouseX, mouseY):
 
         # Hyperparameter to show the range around a line that
         # the mouse should be within to flag that the mouse is close emough
@@ -288,7 +288,7 @@ class MySpline:
 
     # This function drags the line across the screen to the current mouse position.
     # Mouse is held down and the line is dragged.
-    def __line_drag(self, mouseX, mouseY, line_id):
+    def _line_drag(self, mouseX, mouseY, line_id):
         line_index = None
         selected_line = None
 
@@ -325,13 +325,13 @@ class MySpline:
             # Store the modified line in the line list.
             self.lines[line_index] = selected_line
             # Redraw all lines(old line and new updated line)
-            self.__redraw_lines()
+            self._redraw_lines()
         else:  # If no line was found, make no changes.
             print("No Line present.")
 
     # Redraws all previous lines to the new canvas\
 
-    def __redraw_lines(self):
+    def _redraw_lines(self):
         # Reset the canvas back to the original images.
         self.trackbar_img = self.edged_image.copy()
         self.original_image = self.img_untouched.copy()
@@ -360,7 +360,7 @@ class MySpline:
 
         self.show_image()
 
-    def __draw_line(self, calibration_mode=False):
+    def _draw_line(self, calibration_mode=False):
         # Get mouse (x,y) coordinates on left mouse button double click
         x, y = self.mouse_dxpos, self.mouse_dypos
 
@@ -452,7 +452,7 @@ class MySpline:
                 self.log_measurement(message, bullet=True)
 
                 if self.CALIBRATION_COMPLETE:
-                    message = "Line Distance(mm) = " + str(f"{self.__pixel_to_mm(line_distance):.4f}")
+                    message = "Line Distance(mm) = " + str(f"{self._pixel_to_mm(line_distance):.4f}")
                     str(f"{self.lreg.get_intercept():.4f}")
                     self.log_measurement(message, bullet=True)
 
@@ -469,7 +469,7 @@ class MySpline:
             self.line_color = None
             self.line_complete = 0
 
-    def __draw_point(self, event, x, y):
+    def _draw_point(self, event, x, y):
         if event == cv2.EVENT_LBUTTONUP:
             self.points.append(MyPoint([x, y]))
 
@@ -483,7 +483,7 @@ class MySpline:
             message = 'point {}'.format(self.points[-1].point_coord)
             self.log_measurement(message, bullet=True)
 
-    def __calibration_mode(self):
+    def _calibration_mode(self):
         if self.TOTAL_CALIBRATION_NUM is None:
             self.temp_calibration_img = self.clone.copy()
             while True:
@@ -500,7 +500,7 @@ class MySpline:
                         # Cancel calibration mode.
                         self.log_event("Calibration mode canceled.", bullet=True)
                         messagebox.showinfo("Calibration Info", "Calibration mode canceled.")
-                        self.__update_btns_display(None)
+                        self._update_btns_display(None)
                         self.full_reset_all()
                         return
 
@@ -597,13 +597,13 @@ class MySpline:
             self.log_measurement(message, bold=True)
             self.log_measurement("===================\n")
             # Get and store the slope and intercept of the line.
-            self.__calib_slope = self.lreg.get_slope()
-            self.__calib_intercept = self.lreg.get_intercept()
+            self._calib_slope = self.lreg.get_slope()
+            self._calib_intercept = self.lreg.get_intercept()
             # Reset and clear when calibraation is done.
             self.full_reset_all()
             self.log_event("CALIBRATION COMPLETED.", bullet=True)
 
-    def __zoom_img(self, event):
+    def _zoom_img(self, event):
         x, y = event.x, event.y
         flags = event.delta
 
@@ -667,8 +667,8 @@ class MySpline:
 
     # Converts pixel measurement to mm measurement
     # based on slope and intercept gotten from regression.
-    def __pixel_to_mm(self, pixel_line_distance):
-        return self.__calib_slope * pixel_line_distance + self.__calib_intercept
+    def _pixel_to_mm(self, pixel_line_distance):
+        return self._calib_slope * pixel_line_distance + self._calib_intercept
 
     def get_edged_img(self):
         return self.clone
@@ -680,7 +680,7 @@ class MySpline:
         return self.points
 
     # Call when slider is used by user
-    def __on_trackbar(self, val):
+    def _on_trackbar(self, val):
         self.trackbar_value = float(val)
 
         # when alpha is max, show original image
@@ -724,7 +724,7 @@ class MySpline:
         self.linelen_calib_measure = []
         self.linelen_pixel_measure = []
 
-    def __frames_n_images_init(self):
+    def _frames_n_images_init(self):
         # Window frame setup
         self.frame = tk.Frame(self.root)
 
@@ -760,7 +760,7 @@ class MySpline:
         self.zoom_label = tk.Label(self.img_frame, bd=0, highlightthickness=0)
         self.zoom_label.pack(side=tk.LEFT, padx=10)
 
-    def __drawing_canvas_init(self):
+    def _drawing_canvas_init(self):
         self.tk_main_img = convert_to_tk_img(self.clone)
         # Create a drawing canvas to allow drawing on the main image
         self.drawing_canvas = tk.Canvas(
@@ -773,7 +773,7 @@ class MySpline:
         self.drawing_canvas.pack(side=tk.LEFT)
         self.drawing_canvas.create_image(0, 0, anchor="nw", image=self.tk_main_img, tags="MAIN_IMG")
 
-    def __side_frame_widgets_init(self):
+    def _side_frame_widgets_init(self):
 
         # Show main menu button and set the button position
         self.mode_buttons["Main Menu"] = tk.Button(self.button_frame,
@@ -787,7 +787,7 @@ class MySpline:
         # Show calibration button and set the button position
         self.mode_buttons["Calibration"] = tk.Button(self.button_frame,
                                                      text="CALIBRATION",
-                                                     command=lambda: self.__update_btns_display("Calibration"),
+                                                     command=lambda: self._update_btns_display("Calibration"),
                                                      bg=self.INACTIVE_COLOR,
                                                      fg=self.TEXT_INACTIVE
                                                      )
@@ -796,7 +796,7 @@ class MySpline:
         # Show line measurement button and set the button position
         self.mode_buttons["Straight Line"] = tk.Button(self.button_frame,
                                                        text="MEASURE",
-                                                       command=lambda: self.__update_btns_display("Straight Line"),
+                                                       command=lambda: self._update_btns_display("Straight Line"),
                                                        bg=self.INACTIVE_COLOR,
                                                        fg=self.TEXT_INACTIVE
                                                        )
@@ -832,7 +832,7 @@ class MySpline:
                                            relief="raised",
                                            troughcolor="#8fdbc7",
                                            highlightthickness=3,
-                                           command=self.__on_trackbar)
+                                           command=self._on_trackbar)
         self.superimpose_slider.set(0)
 
         # Show the slider
@@ -884,7 +884,7 @@ class MySpline:
         self.display_frame.columnconfigure(0, weight=1)  # Event log label & window
         self.display_frame.columnconfigure(1, weight=1)  # Measurement log window
 
-    def __update_btns_display(self, mode):
+    def _update_btns_display(self, mode):
         # Change the button background color and text to display
         # the current button selected.
         for name, btn in self.mode_buttons.items():
@@ -894,7 +894,7 @@ class MySpline:
                 btn.config(bg=self.INACTIVE_COLOR, fg=self.TEXT_INACTIVE)
 
         # Call the mode associated the button clicked.
-        self.__mode_select(mode)
+        self._mode_select(mode)
 
     def log_event(self, message, bullet=False, bold=False, repeat=True):
         if not repeat and message in self._logged_messages:
@@ -923,23 +923,23 @@ class MySpline:
         self.measure_window.see("end")  # auto-scroll
         self.measure_window.config(state="disabled")
 
-    def __mouse_binding(self):
-        self.drawing_canvas.bind("<Button-1>", self.__on_mouse_left_click)
-        self.drawing_canvas.bind("<Double-Button-1>", self.__on_double_click)
-        self.drawing_canvas.bind("<Motion>", self.__on_mouse_move)
-        self.drawing_canvas.bind("<MouseWheel>", self.__on_mousewheel)
+    def _mouse_binding(self):
+        self.drawing_canvas.bind("<Button-1>", self._on_mouse_left_click)
+        self.drawing_canvas.bind("<Double-Button-1>", self._on_double_click)
+        self.drawing_canvas.bind("<Motion>", self._on_mouse_move)
+        self.drawing_canvas.bind("<MouseWheel>", self._on_mousewheel)
 
-    def __on_mouse_left_click(self, event):
+    def _on_mouse_left_click(self, event):
         self.mouse_xpos = event.x
         self.mouse_ypos = event.y
 
-    def __on_double_click(self, event):
+    def _on_double_click(self, event):
         self.mouse_dxpos = event.x
         self.mouse_dypos = event.y
         # Update the modes called on double clicking the left mouse button.
         self.update_modes()
 
-    def __on_mouse_move(self, event):
+    def _on_mouse_move(self, event):
         self.mouse_xpos = event.x
         self.mouse_ypos = event.y
         self.mouse_moving = True
@@ -961,24 +961,24 @@ class MySpline:
 
         # 100ms was arbitrarily chosen.
 
-        self._after_id = self.root.after(100, self.__mouse_stopped)
+        self._after_id = self.root.after(100, self._mouse_stopped)
 
         #
         if self.zoomed_atleast_once:
-            self.__calc_mouse_pos_on_zoom_img(event)
-            self.__mouse_move_on_zoom_img()
+            self._calc_mouse_pos_on_zoom_img(event)
+            self._mouse_move_on_zoom_img()
 
-    def __mouse_stopped(self):
+    def _mouse_stopped(self):
         self.mouse_moving = False
-        # clear after_id and allow __on_mouse_move() to cancel
+        # clear after_id and allow _on_mouse_move() to cancel
         # the previous scheduled event call.
         self._after_id = None
 
-    def __on_mousewheel(self, event):
+    def _on_mousewheel(self, event):
         self.zoomed_atleast_once = True
-        self.__zoom_img(event)
+        self._zoom_img(event)
 
-    def __mouse_move_on_zoom_img(self):
+    def _mouse_move_on_zoom_img(self):
         if self.zoomed_xpos is None or self.zoomed_ypos is None:
             return
 
@@ -1007,7 +1007,7 @@ class MySpline:
 
         # Takes current mouse x, y pos and returns mouse x, y pos on zoomed img
 
-    def __calc_mouse_pos_on_zoom_img(self, event):
+    def _calc_mouse_pos_on_zoom_img(self, event):
         mouse_xpos, mouse_ypos = event.x, event.y
         # Calculate offset
         x2_offset = self.x1_offset + self.new_width
@@ -1033,10 +1033,10 @@ class MySpline:
 
     def update_modes(self):
         if self.modeselect == "Straight Line":
-            self.__draw_line()
+            self._draw_line()
         if self.modeselect == "Calibration":
-            self.__draw_line(calibration_mode=True)
-            self.__calibration_mode()
+            self._draw_line(calibration_mode=True)
+            self._calibration_mode()
 
     def mode_instructions(self):
         if self.modeselect == "Straight Line":
