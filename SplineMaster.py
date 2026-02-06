@@ -137,8 +137,9 @@ class MySpline:
         self._calib_intercept = None
 
         # Used in line zoom calculation
+        self.mouse_scroll_value = 0
         self.zoomed_atleast_once = False
-        self.zoom = 1
+        self.zoom_factor = 1
         self.MIN_ZOOM = 1
         self.MAX_ZOOM = 10
         self.new_width = None
@@ -156,7 +157,12 @@ class MySpline:
 
         # Used in tracking if mouse was moved
         self.mouse_moving = False
-        self._after_id = None  # stores the after() id so we can cancel it
+        self._mouse_move_id = None  # stores the mouse_move id so we can cancel it via after_cancel
+
+        # Used in left mouse held down and left mouse release
+        self.lmouse_held = False
+        self._lmouse_held_id = None  # stores the _mouse_held id so we can cancel it via after_cancel
+        self.mouse_left_release = True
 
         # Used to track mouse click x,y position
         self.mouse_xpos = None
@@ -168,7 +174,6 @@ class MySpline:
 
         # Used in mouse dragging
         self.start_drag = False
-        self.mouse_dragging = False
         self.one_line_picked_for_drag = False
         self.closest_mouse_line_id = -1
 
@@ -184,12 +189,13 @@ class MySpline:
         # initialize mouse functions binding
         self._mouse_binding()
 
+        self.count = 0
+
     # Select mode
     def _mode_select(self, mode_selected):
         self.modeselect = mode_selected
-        # self._mouse_drag(event, x, y, flags, parameters)
 
-        if self.modeselect == "Straight Line":  # and not self.mouse_dragging:
+        if self.modeselect == "Straight Line":
             self.log_event("\nStarted Straight Line Measurement Mode", bold=True)
             self.mode_instructions()
 
@@ -201,29 +207,41 @@ class MySpline:
             self.full_reset_all()
             self.mode_instructions()
             self._calibration_mode()
-            # self.calibration_mode(event, x, y)
 
-        # Clear drawing boxes on right mouse button click
-        # if event == cv2.EVENT_RBUTTONDOWN:
-        #    self.full_reset_all()
+    def _mouse_drag(self):
+        self.count += 1
 
-    def _mouse_drag(self, event, x, y, flags, parameters):
+        # message = f"count = {self.count}"
+        # self.log_event(message, bullet=True)
 
+        x, y = self.mouse_xpos, self.mouse_ypos
         # Finds out if the mouse is close to a drawn line and what line it is.
         mouse_close_to_a_line, closest_line_ID = self._mouse_is_close_to_a_line(x, y)
 
-        # print(f'mouse close to line: {mouse_close_to_a_line}, line_id:{closest_line_ID}')
-        # print(f'line_id:{closest_line_ID}')
+        # message = f'mouse close to line: {mouse_close_to_a_line}, line_id:{closest_line_ID}'
+        # self.log_event(message)
+
+        # if not mouse_close_to_a_line or closest_line_ID is None:
+        #    self.log_event("Kicked out of _mouse_drag() function")
+        #    return
 
         # If the mouse left button is held down and the mouse is close to a line...
-        if event == cv2.EVENT_LBUTTONDOWN and mouse_close_to_a_line:
+        # if event == cv2.EVENT_LBUTTONDOWN and mouse_close_to_a_line:
+        # message = (f"self.lmouse_held ={self.lmouse_held},"
+        #           f" mouse_close_to_a_line = {mouse_close_to_a_line}")
+
+        # self.log_event(message, bullet=True)
+
+        if self.lmouse_held and mouse_close_to_a_line:
+            # print(f"At count {self.count}, mouse held and is close to line ")
+            # message = f"At count {self.count}, mouse held and is close to line "
+            # self.log_event(message)
             # Flag set for conditions to mouse drag.
             self.start_drag = True
 
         # if mouse is moved and the dragging conditions are met...
-        elif event == cv2.EVENT_MOUSEMOVE and self.start_drag:
-            self.mouse_dragging = True
-
+        # elif event == cv2.EVENT_MOUSEMOVE and self.start_drag:
+        if self.mouse_moving and self.start_drag:
             # If one line selected is being dragged,
             # dont allow another line to be able to be dragged.
             self.one_line_picked_for_drag = True
@@ -232,12 +250,11 @@ class MySpline:
             self._line_drag(x, y, closest_line_ID)
 
         # If the mouse left button is released...
-        elif event == cv2.EVENT_LBUTTONUP:
-
+        if self.mouse_left_release:
             self.one_line_picked_for_drag = False
-            self.start_drag = False
+
             # Turn off mouse dragging.
-            self.mouse_dragging = False
+            self.start_drag = False
 
     # Function to determine if a mouse is close to a line
     # and what line it is.
@@ -263,13 +280,14 @@ class MySpline:
                     x2, y2 = line.ending_point[0], line.ending_point[1]
 
                     # Calculate the distance between a point and a line by setting up a
-                    # traingle between the line and the mouse point and calcualte the height at
+                    # traingle between the line and the mouse point and calculate the height at
                     # any given mouse coordinate.
                     numerator = math.fabs(mouseX * (y2 - y1) - mouseY * (x2 - x1) + x2 * y1 - y2 * x1)
                     denominator = math.sqrt(math.pow((y2 - y1), 2) + math.pow((x2 - x1), 2))
                     current_mouse_line_proximity = int(numerator / denominator)
 
-                    # Get the line id of the line that is closest to the mouse and its distance away from the mouse
+                    # Get the line id of the line that is closest to the mouse and 
+                    # its distance away from the mouse
                     if shortest_mouse_line_proximity > current_mouse_line_proximity:
                         shortest_mouse_line_proximity = current_mouse_line_proximity
                         self.closest_mouse_line_id = line.get_id()
@@ -282,7 +300,7 @@ class MySpline:
                 else:
                     return False, self.closest_mouse_line_id
             else:
-                return True, self.closest_mouse_line_id
+                return False, self.closest_mouse_line_id
         else:  # If no line is drawn, the mouse proximity as false and the line id as none.
             return False, None
 
@@ -370,7 +388,7 @@ class MySpline:
             self.line_starting_point = [x, y]
 
         # Draw the first point of the line
-        radius = 2
+        radius = 1
         cv2.circle(self.clone, (x, y), radius, [0, 195, 225], 2)
         cv2.circle(self.trackbar_img, (x, y), radius, [0, 195, 225], 2)
         cv2.circle(self.original_image, (x, y), radius, [0, 195, 225], 2)
@@ -603,56 +621,65 @@ class MySpline:
             self.full_reset_all()
             self.log_event("CALIBRATION COMPLETED.", bullet=True)
 
-    def _zoom_img(self, event):
-        x, y = event.x, event.y
-        flags = event.delta
+    def _img_zoom(self, event=None, zoom_factor_freeze=False):
+        x, y = self.mouse_xpos, self.mouse_ypos
 
-        # Display zoom factor on event log window
-        if self.zoom != self.MIN_ZOOM and self.zoom != self.MAX_ZOOM:
-            message = f"Zoom: {int(self.zoom)}X"
-            self.log_event(message, True, repeat=False)
+        # If there is mouse scroll/movement...
+        if event is None:
+            # Freeze the zoom effect
+            zoom_factor_freeze = True
 
-        # If Zooming in or out
-        zoom_speed = 1.1
-        if flags > 0:
-            self._logged_messages.discard("MINIMUM ZOOM REACHED")
-            self.zoom *= zoom_speed
-            self.zoom = min(self.zoom, self.MAX_ZOOM)  # zoom in
-            self.full_zoomed_OUT_flag = False
+        # Display zoom factor on event log window if the zoom factor is not frozen.
+        # Note: Zoom factor changes with mouse wheel scroll but not mouse movement.
+        if not zoom_factor_freeze:
+            # Update the mouse wheel scroll value to be later used to update the zoom factor: self.zoom_factor
+            self.mouse_scroll_value = event.delta
+            if self.zoom_factor != self.MIN_ZOOM and self.zoom_factor != self.MAX_ZOOM:
+                message = f"Zoom: {int(self.zoom_factor)}X"
+                self.log_event(message, True, repeat=False)
 
-            # discard the previous max zoom factor logged message
-            discard_message = f"Zoom: {int(self.zoom) - 1}X"
-            self._logged_messages.discard(discard_message)
+        # If Zooming in or out when zoom factor not frozen...
+        if not zoom_factor_freeze:
+            zoom_speed = 1.1
+            if self.mouse_scroll_value > 0:
+                self._logged_messages.discard("MINIMUM ZOOM REACHED")
+                self.zoom_factor *= zoom_speed
+                self.zoom_factor = min(self.zoom_factor, self.MAX_ZOOM)  # zoom in
+                self.full_zoomed_OUT_flag = False
 
-            if self.zoom == self.MAX_ZOOM:
-                self.full_zoomed_IN_flag = True
-                self.log_event("MAXIMUM ZOOM REACHED", True, repeat=False)
+                # discard the previous max zoom factor logged message
+                discard_message = f"Zoom: {int(self.zoom_factor) - 1}X"
+                self._logged_messages.discard(discard_message)
 
-        else:
-            self._logged_messages.discard("MAXIMUM ZOOM REACHED")
-            self.zoom /= zoom_speed
-            self.zoom = max(self.zoom, self.MIN_ZOOM)  # zoom out
-            self.full_zoomed_IN_flag = False
+                if self.zoom_factor == self.MAX_ZOOM:
+                    self.full_zoomed_IN_flag = True
+                    self.log_event("MAXIMUM ZOOM REACHED", True, repeat=False)
 
-            # discard the previous min zoom factor logged message
-            discard_message = f"Zoom: {int(self.zoom) + 1}X"
-            self._logged_messages.discard(discard_message)
+            else:
+                self._logged_messages.discard("MAXIMUM ZOOM REACHED")
+                self.zoom_factor /= zoom_speed
+                self.zoom_factor = max(self.zoom_factor, self.MIN_ZOOM)  # zoom out
+                self.full_zoomed_IN_flag = False
 
-            if self.zoom == self.MIN_ZOOM:
-                self.full_zoomed_OUT_flag = True
-                self.log_event("MINIMUM ZOOM REACHED", True, repeat=False)
+                # discard the previous min zoom factor logged message
+                discard_message = f"Zoom: {int(self.zoom_factor) + 1}X"
+                self._logged_messages.discard(discard_message)
+
+                if self.zoom_factor == self.MIN_ZOOM:
+                    self.full_zoomed_OUT_flag = True
+                    self.log_event("MINIMUM ZOOM REACHED", True, repeat=False)
 
         img = self.clone.copy()
 
         # Calculate zoomed-in image size
-        self.new_width = round(img.shape[1] / self.zoom)
-        self.new_height = round(img.shape[0] / self.zoom)
+        self.new_width = round(img.shape[1] / self.zoom_factor)
+        self.new_height = round(img.shape[0] / self.zoom_factor)
 
         # Calculate offset
-        self.x1_offset = round(x - (x / self.zoom))
+        self.x1_offset = round(x - (x / self.zoom_factor))
         x2_offset = self.x1_offset + self.new_width
 
-        self.y1_offset = round(y - (y / self.zoom))
+        self.y1_offset = round(y - (y / self.zoom_factor))
         y2_offset = self.y1_offset + self.new_height
 
         # Crop image
@@ -663,7 +690,10 @@ class MySpline:
 
         # Stretch image to full size
         self.img_zoom_cache = cv2.resize(cropped_img, (self.edged_image.shape[1], self.edged_image.shape[0]))
-        self.show_image()
+
+        # If the image has changed by being zoomed...
+        if not zoom_factor_freeze:
+            self.show_image()
 
     # Converts pixel measurement to mm measurement
     # based on slope and intercept gotten from regression.
@@ -928,10 +958,18 @@ class MySpline:
         self.drawing_canvas.bind("<Double-Button-1>", self._on_double_click)
         self.drawing_canvas.bind("<Motion>", self._on_mouse_move)
         self.drawing_canvas.bind("<MouseWheel>", self._on_mousewheel)
+        self.drawing_canvas.bind("<ButtonRelease-1>", self._mouse_left_release)
 
     def _on_mouse_left_click(self, event):
         self.mouse_xpos = event.x
         self.mouse_ypos = event.y
+
+        self.mouse_left_release = False
+
+        # If the left mouse held down is not flagged...
+        if not self.lmouse_held:
+            # Set it on left mouse pressed
+            self.lmouse_held = True
 
     def _on_double_click(self, event):
         self.mouse_dxpos = event.x
@@ -944,13 +982,16 @@ class MySpline:
         self.mouse_ypos = event.y
         self.mouse_moving = True
 
+        # Check if the mouse move is dragging
+        self._mouse_drag()
+
         # Cancel previous timer if exists.
         # root.after_cancel is used to cancel the previous scheduled event.
         # if not the previous scheduled event still executes and mouse_stopped function is called
         # after 100ms.
 
-        if self._after_id is not None:
-            self.root.after_cancel(self._after_id)
+        if self._mouse_move_id is not None:
+            self.root.after_cancel(self._mouse_move_id)
 
         # Start a new timer everytime the function: on_mouse_move() is called.
         # self.root.after creates scheduled event in Tk that calls mouse_stopped() function,
@@ -961,52 +1002,35 @@ class MySpline:
 
         # 100ms was arbitrarily chosen.
 
-        self._after_id = self.root.after(100, self._mouse_stopped)
+        self._mouse_move_id = self.root.after(100, self._mouse_stopped)
 
         #
         if self.zoomed_atleast_once:
+            self._img_zoom(event, zoom_factor_freeze=True)
             self._calc_mouse_pos_on_zoom_img(event)
             self._mouse_move_on_zoom_img()
 
     def _mouse_stopped(self):
         self.mouse_moving = False
-        # clear after_id and allow _on_mouse_move() to cancel
+        # clear _mouse_move_id and allow _on_mouse_move() to cancel
         # the previous scheduled event call.
-        self._after_id = None
+        self._mouse_move_id = None
+
+    def _mouse_left_release(self, event):
+        self.mouse_left_release = True
+        self._cancel_lmouse_held()
+
+    def _cancel_lmouse_held(self):
+        self.lmouse_held = False
+        # if self._lmouse_held_id:
+        #    self.root.after_cancel(self._lmouse_held_id)
 
     def _on_mousewheel(self, event):
         self.zoomed_atleast_once = True
-        self._zoom_img(event)
+        self._img_zoom(event, zoom_factor_freeze=False)
 
-    def _mouse_move_on_zoom_img(self):
-        if self.zoomed_xpos is None or self.zoomed_ypos is None:
-            return
-
-        max_radius = 4
-        min_radius = 1
-
-        radius = max_radius + (self.zoom - self.MIN_ZOOM) * (
-                (min_radius - max_radius) / (self.MAX_ZOOM - self.MIN_ZOOM))
-        radius = int(radius)
-        # Draw a visual tracking circle to follow the mouse's position on the zoomed image.
-        img = self.img_zoom_cache.copy()
-        # inner circle
-        cv2.circle(self.img_zoom_cache,
-                   (self.zoomed_xpos, self.zoomed_ypos),
-                   radius,
-                   (0, 225, 225),
-                   -1)
-        # Draw a highlighting outer circle around the main circle
-        cv2.circle(self.img_zoom_cache,
-                   (self.zoomed_xpos, self.zoomed_ypos),
-                   radius,
-                   (0, 0, 225),
-                   2)
-        self.show_image()
-        self.img_zoom_cache = img.copy()
-
-        # Takes current mouse x, y pos and returns mouse x, y pos on zoomed img
-
+    # Takes current mouse x, y pos and sets mouse x, y relative
+    # cordinates on zoomed image. 
     def _calc_mouse_pos_on_zoom_img(self, event):
         mouse_xpos, mouse_ypos = event.x, event.y
         # Calculate offset
@@ -1030,6 +1054,35 @@ class MySpline:
 
         self.zoomed_xpos = int(zoom_factorx * self.img_zoom_cache.shape[1])
         self.zoomed_ypos = int(zoom_factory * self.img_zoom_cache.shape[0])
+
+    # Displays a dynamic growing mouse-tracking circle on the zoomed image.
+    # Circle grow size depends on min/max zoom from mouse wheel scroll.
+    def _mouse_move_on_zoom_img(self):
+        if self.zoomed_xpos is None or self.zoomed_ypos is None:
+            return
+
+        max_radius = 4
+        min_radius = 1
+
+        radius = max_radius + (self.zoom_factor - self.MIN_ZOOM) * (
+                (min_radius - max_radius) / (self.MAX_ZOOM - self.MIN_ZOOM))
+        radius = int(radius)
+        # Draw a visual tracking circle to follow the mouse's position on the zoomed image.
+        img = self.img_zoom_cache.copy()
+        # inner circle
+        cv2.circle(self.img_zoom_cache,
+                   (self.zoomed_xpos, self.zoomed_ypos),
+                   radius,
+                   (0, 225, 225),
+                   -1)
+        # Draw a highlighting outer circle around the main circle
+        cv2.circle(self.img_zoom_cache,
+                   (self.zoomed_xpos, self.zoomed_ypos),
+                   radius,
+                   (0, 0, 225),
+                   2)
+        self.show_image()
+        self.img_zoom_cache = img.copy()
 
     def update_modes(self):
         if self.modeselect == "Straight Line":
@@ -1079,6 +1132,11 @@ class MySpline:
         self.drawing_canvas.create_image(0, 0, anchor="nw", image=self.tk_main_img, tags="MAIN_IMG")
 
         # --ZOOM IMAGE--
+        # Update the zoom image with no zooming.
+        # The image must have been zoomed at least once in the session.
+        #if self.zoomed_atleast_once:
+        #    self._img_zoom(zoom_factor_freeze=True)
+        
         tk_zoom_img = convert_to_tk_img(self.img_zoom_cache)
         self.zoom_label.config(image=tk_zoom_img)
         self.zoom_label.image = tk_zoom_img  # Keep a reference
